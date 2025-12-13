@@ -160,15 +160,15 @@
             }
         ];
 
-        // --- Icons ---
+        // --- Icons (Fixed for JSX Fragments) ---
         const icons = {
             check: <polyline points="20 6 9 17 4 12" />,
             play: <polygon points="5 3 19 12 5 21 5 3" />,
-            pause: <><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>, // Pause Icon fixed
-            skipForward: <><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></>, // Next Track fixed
-            repeat: <><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>, // Loop fixed
-            repeat1: <><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /><text x="10" y="16" fontSize="8" fontWeight="bold">1</text></>, // Single Loop
-            shuffle: <><polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" /><polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" /><line x1="4" y1="4" x2="9" y2="9" /></>, // Shuffle fixed
+            pause: <><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>,
+            skipForward: <><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></>,
+            repeat: <><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>,
+            repeat1: <><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /><text x="10" y="16" fontSize="8" fontWeight="bold">1</text></>,
+            shuffle: <><polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" /><polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" /><line x1="4" y1="4" x2="9" y2="9" /></>,
             music: <><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></>,
             book: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
             menu: <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
@@ -206,12 +206,11 @@
             );
         };
 
-        // --- Music Player Widget ---
-        const MusicWidget = () => {
+        // --- Top Music Bar ---
+        const MusicBar = () => {
             const [isPlaying, setIsPlaying] = useState(false);
             const [trackIndex, setTrackIndex] = useState(0);
             const [playMode, setPlayMode] = useState('loop'); // loop, single, shuffle
-            const [isExpanded, setIsExpanded] = useState(false);
             const audioRef = useRef(new Audio());
             
             // 初始化：讀取設定
@@ -220,7 +219,6 @@
                 if (savedState) {
                     setTrackIndex(savedState.trackIndex || 0);
                     setPlayMode(savedState.playMode || 'loop');
-                    // 注意：不自動播放，除非瀏覽器允許，但通常需要使用者互動，這裡先保持暫停
                 }
                 
                 const audio = audioRef.current;
@@ -241,12 +239,10 @@
             useEffect(() => {
                 const audio = audioRef.current;
                 if (PLAYLIST.length > 0) {
-                    // 只有當 source 改變時才重新設定 src，避免中斷
-                    const currentSrc = audio.src.split('/').pop(); // 簡單檢查檔名
-                    const targetSrc = PLAYLIST[trackIndex].split('/').pop();
-                    
-                    if (!audio.src || !decodeURIComponent(audio.src).includes(PLAYLIST[trackIndex])) {
-                        audio.src = PLAYLIST[trackIndex];
+                    const targetSrc = PLAYLIST[trackIndex];
+                    // 只有當 source 改變時才重新設定 src
+                    if (!audio.src || !decodeURIComponent(audio.src).endsWith(targetSrc)) {
+                        audio.src = targetSrc;
                     }
 
                     if (isPlaying) {
@@ -318,53 +314,31 @@
             };
 
             return (
-                <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 ${isExpanded ? 'w-64' : 'w-12 h-12'}`}>
-                    <div className={`bg-white/90 backdrop-blur-md shadow-2xl rounded-full border-2 border-amber-200 overflow-hidden transition-all duration-300 ${isExpanded ? 'rounded-2xl p-4' : 'hover:scale-110 cursor-pointer'}`}>
-                        {/* 收合狀態：只顯示旋轉光碟圖示 */}
-                        {!isExpanded && (
-                            <div onClick={() => setIsExpanded(true)} className="w-full h-full flex items-center justify-center relative">
-                                <div className={`absolute inset-0 rounded-full border-2 border-amber-400 border-dashed ${isPlaying ? 'animate-spin-slow' : ''}`}></div>
-                                <Icon path={icons.music} className={`w-6 h-6 text-amber-600 ${isPlaying ? 'animate-pulse' : ''}`} />
-                            </div>
-                        )}
-
-                        {/* 展開狀態：控制面板 */}
-                        {isExpanded && (
-                            <div className="flex flex-col gap-3">
-                                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <div className={`w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center border border-amber-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
-                                            <Icon path={icons.music} className="w-4 h-4 text-amber-600" />
-                                        </div>
-                                        <div className="text-xs font-bold text-gray-600 truncate">
-                                            BGM {trackIndex + 1}
-                                        </div>
-                                    </div>
-                                    <button onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }} className="text-gray-400 hover:text-gray-600">
-                                        ✕
-                                    </button>
-                                </div>
-
-                                <div className="flex justify-between items-center gap-2">
-                                    <button onClick={toggleMode} className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-colors" title={`模式: ${playMode}`}>
-                                        <Icon path={getModeIcon()} className="w-4 h-4" />
-                                    </button>
-                                    
-                                    <div className="flex items-center gap-1">
-                                        <button onClick={prevTrack} className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-full">
-                                            <Icon path={icons.left} className="w-5 h-5" />
-                                        </button>
-                                        <button onClick={togglePlay} className="p-3 bg-amber-500 text-white rounded-full hover:bg-amber-600 shadow-md transform active:scale-95 transition-all">
-                                            <Icon path={isPlaying ? icons.pause : icons.play} className="w-5 h-5 fill-current" />
-                                        </button>
-                                        <button onClick={nextTrack} className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-full">
-                                            <Icon path={icons.skipForward} className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                <div className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b-2 border-amber-200 shadow-sm px-4 py-2 flex items-center justify-between">
+                    {/* Track Info */}
+                    <div className="flex items-center gap-3">
+                       <div className={`w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center border border-amber-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
+                            <Icon path={icons.music} className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div className="hidden md:block text-sm font-bold text-gray-600">
+                            BGM {trackIndex + 1}
+                        </div>
                     </div>
+
+                    {/* Controls */}
+                    <div className="flex items-center gap-2">
+                         <button onClick={prevTrack} className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-colors"><Icon path={icons.left} className="w-5 h-5" /></button>
+                         <button onClick={togglePlay} className={`p-2 rounded-full transition-all shadow-sm ${isPlaying ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                            <Icon path={isPlaying ? icons.pause : icons.play} className="w-5 h-5 fill-current" />
+                         </button>
+                         <button onClick={nextTrack} className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-colors"><Icon path={icons.skipForward} className="w-5 h-5" /></button>
+                    </div>
+
+                    {/* Mode */}
+                    <button onClick={toggleMode} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-50 hover:bg-gray-100 text-xs font-bold text-gray-500 transition-colors border border-gray-200" title="切換播放模式">
+                        <Icon path={getModeIcon()} className="w-3 h-3" />
+                        <span className="hidden md:inline">{playMode === 'loop' ? '循環' : playMode === 'single' ? '單曲' : '隨機'}</span>
+                    </button>
                 </div>
             );
         };
@@ -477,7 +451,7 @@
         );
 
         // TableView 組件
-        const TableView = ({ items, onMenu, favorites }) => {
+        const TableView = ({ items, onMenu, favorites, toggleFavorite }) => {
             const [searchTerm, setSearchTerm] = useState("");
             
             const filteredItems = useMemo(() => {
@@ -525,7 +499,7 @@
                             <table className="w-full text-left border-collapse prose-table">
                                 <thead className="bg-purple-50 sticky top-0 z-10 shadow-sm">
                                     <tr>
-                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-20 text-center">編號</th>
+                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-24 text-center">編號</th>
                                         <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-48">語詞 (重點)</th>
                                         <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-32">正確注音</th>
                                         <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-48">完整注音</th>
@@ -537,9 +511,13 @@
                                         filteredItems.map(item => (
                                             <tr key={item.id} className="hover:bg-purple-50/50 transition-colors">
                                                 <td className="p-4 text-center font-mono text-gray-500 font-bold bg-gray-50/50">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        {favorites.includes(item.id) && <Icon path={icons.heart} className="w-3 h-3 text-red-500 fill-current" />}
-                                                        {item.id}
+                                                    <div className="flex items-center justify-center gap-2 cursor-pointer group" onClick={() => toggleFavorite(item.id)} title={favorites.includes(item.id) ? "取消收藏" : "加入收藏"}>
+                                                        <Icon 
+                                                            path={icons.heart} 
+                                                            className={`w-5 h-5 transition-all ${favorites.includes(item.id) ? "text-red-500 fill-current scale-110" : "text-gray-300 group-hover:text-red-300"}`} 
+                                                            fill={favorites.includes(item.id) ? "currentColor" : "none"}
+                                                        />
+                                                        {String(item.id).padStart(3, '0')}
                                                     </div>
                                                 </td>
                                                 <td className="p-4 font-bold text-gray-900 text-lg sticky left-0 bg-white md:static">
@@ -1277,8 +1255,8 @@
                     {/* Overlay for Readability */}
                     <div className="fixed inset-0 z-0 bg-white/70 backdrop-blur-[2px]"></div>
                     
-                    {/* 音樂播放器 */}
-                    <MusicWidget />
+                    {/* 音樂播放器 (現在位於頂端) */}
+                    <MusicBar />
 
                     {/* Main Content Area */}
                     <div className="relative z-10">
@@ -1332,6 +1310,7 @@
                                 items={allItems}
                                 onMenu={() => setCurrentMode('menu')}
                                 favorites={favorites}
+                                toggleFavorite={toggleFavorite}
                             />
                         )}
                     </div>
