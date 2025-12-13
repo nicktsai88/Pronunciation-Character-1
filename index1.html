@@ -51,10 +51,6 @@
             75% { transform: translateX(5px); }
         }
         .animate-shake { animation: shake 0.4s ease-in-out; }
-
-        /* 音樂播放器動畫 */
-        @keyframes rotate-disk { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin-slow { animation: rotate-disk 8s linear infinite; }
         
         /* 圖片容器互動 */
         .group-img:hover img { transform: scale(1.08); }
@@ -86,17 +82,15 @@
         
         // Storage Key Prefix
         const STORAGE_PREFIX = "Pronunciation_Character_1";
-        const MUSIC_STORAGE_KEY = `${STORAGE_PREFIX}_MusicState`;
-
-        // --- 音樂設定 ---
-        const PLAYLIST = [
-            'sounds/bgm1.mp3','sounds/bgm2.mp3','sounds/bgm3.mp3',
-            'sounds/bgm4.mp3','sounds/bgm5.mp3','sounds/bgm6.mp3',
-            'sounds/bgm7.mp3','sounds/bgm8.mp3','sounds/bgm9.mp3',
-            'sounds/bgm10.mp3','sounds/bgm11.mp3','sounds/bgm12.mp3'
-        ];
 
         // --- 字音資料庫 (1-5) ---
+        // 自動生成干擾項邏輯：
+        // 1. 仝(ㄊㄨㄥˊ) -> 混淆：ㄑㄩㄢˊ(全), ㄍㄨㄥ(工), ㄊㄨㄥ(一聲)
+        // 2. 傭(ㄩㄥ) -> 混淆：ㄩㄥˋ(佣), ㄊㄨㄥ(通), ㄧㄨㄥ(音近)
+        // 3. 脯(ㄆㄨˊ) -> 混淆：ㄈㄨˇ(脯-肉乾), ㄅㄨˇ(補), ㄆㄨˇ(三聲)
+        // 4. 魘(ㄧㄢˇ) -> 混淆：ㄧㄢˋ(厭), ㄇㄟˋ(魅), ㄧㄚ(壓)
+        // 5. 嚷(ㄖㄤˇ) -> 混淆：ㄖㄤ(一聲), ㄋㄤˇ(囔), ㄌㄤˇ(朗)
+
         const WORD_DATA = [
             { 
                 id: 1, 
@@ -160,16 +154,10 @@
             }
         ];
 
-        // --- Icons ---
+        // --- Icons (維持不變) ---
         const icons = {
             check: <polyline points="20 6 9 17 4 12" />,
             play: <polygon points="5 3 19 12 5 21 5 3" />,
-            pause: <><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>, // Pause Icon fixed
-            skipForward: <><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></>, // Next Track fixed
-            repeat: <><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>, // Loop fixed
-            repeat1: <><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /><text x="10" y="16" fontSize="8" fontWeight="bold">1</text></>, // Single Loop
-            shuffle: <><polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" /><polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" /><line x1="4" y1="4" x2="9" y2="9" /></>, // Shuffle fixed
-            music: <><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></>,
             book: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
             menu: <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
             left: <polyline points="15 18 9 12 15 6"/>,
@@ -203,169 +191,6 @@
                         </React.Fragment>
                     ))}
                 </span>
-            );
-        };
-
-        // --- Music Player Widget ---
-        const MusicWidget = () => {
-            const [isPlaying, setIsPlaying] = useState(false);
-            const [trackIndex, setTrackIndex] = useState(0);
-            const [playMode, setPlayMode] = useState('loop'); // loop, single, shuffle
-            const [isExpanded, setIsExpanded] = useState(false);
-            const audioRef = useRef(new Audio());
-            
-            // 初始化：讀取設定
-            useEffect(() => {
-                const savedState = JSON.parse(localStorage.getItem(MUSIC_STORAGE_KEY));
-                if (savedState) {
-                    setTrackIndex(savedState.trackIndex || 0);
-                    setPlayMode(savedState.playMode || 'loop');
-                    // 注意：不自動播放，除非瀏覽器允許，但通常需要使用者互動，這裡先保持暫停
-                }
-                
-                const audio = audioRef.current;
-                audio.volume = 0.3;
-                
-                const handleEnded = () => {
-                    handleTrackEnd();
-                };
-                
-                audio.addEventListener('ended', handleEnded);
-                return () => {
-                    audio.pause();
-                    audio.removeEventListener('ended', handleEnded);
-                };
-            }, []);
-
-            // 監聽播放狀態變化並執行播放
-            useEffect(() => {
-                const audio = audioRef.current;
-                if (PLAYLIST.length > 0) {
-                    // 只有當 source 改變時才重新設定 src，避免中斷
-                    const currentSrc = audio.src.split('/').pop(); // 簡單檢查檔名
-                    const targetSrc = PLAYLIST[trackIndex].split('/').pop();
-                    
-                    if (!audio.src || !decodeURIComponent(audio.src).includes(PLAYLIST[trackIndex])) {
-                        audio.src = PLAYLIST[trackIndex];
-                    }
-
-                    if (isPlaying) {
-                        const playPromise = audio.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(error => {
-                                console.log("Playback prevented:", error);
-                                setIsPlaying(false);
-                            });
-                        }
-                    } else {
-                        audio.pause();
-                    }
-                    saveState();
-                }
-            }, [trackIndex, isPlaying]);
-
-            // 儲存狀態
-            const saveState = () => {
-                localStorage.setItem(MUSIC_STORAGE_KEY, JSON.stringify({
-                    trackIndex,
-                    playMode,
-                    isPlaying
-                }));
-            };
-
-            const togglePlay = () => setIsPlaying(!isPlaying);
-
-            const nextTrack = () => {
-                let nextIndex = trackIndex;
-                if (playMode === 'shuffle') {
-                    nextIndex = Math.floor(Math.random() * PLAYLIST.length);
-                } else {
-                    nextIndex = (trackIndex + 1) % PLAYLIST.length;
-                }
-                setTrackIndex(nextIndex);
-                setIsPlaying(true);
-            };
-
-            const prevTrack = () => {
-                let prevIndex = (trackIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
-                setTrackIndex(prevIndex);
-                setIsPlaying(true);
-            };
-
-            const handleTrackEnd = () => {
-                if (playMode === 'single') {
-                    audioRef.current.currentTime = 0;
-                    audioRef.current.play();
-                } else if (playMode === 'shuffle') {
-                    setTrackIndex(Math.floor(Math.random() * PLAYLIST.length));
-                } else { // loop
-                    setTrackIndex(prev => (prev + 1) % PLAYLIST.length);
-                }
-            };
-
-            const toggleMode = () => {
-                const modes = ['loop', 'single', 'shuffle'];
-                const nextMode = modes[(modes.indexOf(playMode) + 1) % modes.length];
-                setPlayMode(nextMode);
-            };
-
-            const getModeIcon = () => {
-                switch(playMode) {
-                    case 'single': return icons.repeat1;
-                    case 'shuffle': return icons.shuffle;
-                    default: return icons.repeat;
-                }
-            };
-
-            return (
-                <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 ${isExpanded ? 'w-64' : 'w-12 h-12'}`}>
-                    <div className={`bg-white/90 backdrop-blur-md shadow-2xl rounded-full border-2 border-amber-200 overflow-hidden transition-all duration-300 ${isExpanded ? 'rounded-2xl p-4' : 'hover:scale-110 cursor-pointer'}`}>
-                        {/* 收合狀態：只顯示旋轉光碟圖示 */}
-                        {!isExpanded && (
-                            <div onClick={() => setIsExpanded(true)} className="w-full h-full flex items-center justify-center relative">
-                                <div className={`absolute inset-0 rounded-full border-2 border-amber-400 border-dashed ${isPlaying ? 'animate-spin-slow' : ''}`}></div>
-                                <Icon path={icons.music} className={`w-6 h-6 text-amber-600 ${isPlaying ? 'animate-pulse' : ''}`} />
-                            </div>
-                        )}
-
-                        {/* 展開狀態：控制面板 */}
-                        {isExpanded && (
-                            <div className="flex flex-col gap-3">
-                                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <div className={`w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center border border-amber-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
-                                            <Icon path={icons.music} className="w-4 h-4 text-amber-600" />
-                                        </div>
-                                        <div className="text-xs font-bold text-gray-600 truncate">
-                                            BGM {trackIndex + 1}
-                                        </div>
-                                    </div>
-                                    <button onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }} className="text-gray-400 hover:text-gray-600">
-                                        ✕
-                                    </button>
-                                </div>
-
-                                <div className="flex justify-between items-center gap-2">
-                                    <button onClick={toggleMode} className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-colors" title={`模式: ${playMode}`}>
-                                        <Icon path={getModeIcon()} className="w-4 h-4" />
-                                    </button>
-                                    
-                                    <div className="flex items-center gap-1">
-                                        <button onClick={prevTrack} className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-full">
-                                            <Icon path={icons.left} className="w-5 h-5" />
-                                        </button>
-                                        <button onClick={togglePlay} className="p-3 bg-amber-500 text-white rounded-full hover:bg-amber-600 shadow-md transform active:scale-95 transition-all">
-                                            <Icon path={isPlaying ? icons.pause : icons.play} className="w-5 h-5 fill-current" />
-                                        </button>
-                                        <button onClick={nextTrack} className="p-2 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-full">
-                                            <Icon path={icons.skipForward} className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
             );
         };
 
@@ -477,7 +302,7 @@
         );
 
         // TableView 組件
-        const TableView = ({ items, onMenu, favorites }) => {
+        const TableView = ({ items, onMenu }) => {
             const [searchTerm, setSearchTerm] = useState("");
             
             const filteredItems = useMemo(() => {
@@ -529,33 +354,20 @@
                                         <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-48">語詞 (重點)</th>
                                         <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-32">正確注音</th>
                                         <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-48">完整注音</th>
-                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100">釋義與例句</th>
+                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100">釋義</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {filteredItems.length > 0 ? (
                                         filteredItems.map(item => (
                                             <tr key={item.id} className="hover:bg-purple-50/50 transition-colors">
-                                                <td className="p-4 text-center font-mono text-gray-500 font-bold bg-gray-50/50">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        {favorites.includes(item.id) && <Icon path={icons.heart} className="w-3 h-3 text-red-500 fill-current" />}
-                                                        {item.id}
-                                                    </div>
-                                                </td>
+                                                <td className="p-4 text-center font-mono text-gray-500 font-bold bg-gray-50/50">{item.id}</td>
                                                 <td className="p-4 font-bold text-gray-900 text-lg sticky left-0 bg-white md:static">
                                                     <HighlightTerm term={item.term} targetChar={item.targetChar} />
                                                 </td>
                                                 <td className="p-4 font-black text-red-600 bopomofo">{item.targetZhuyin}</td>
                                                 <td className="p-4 text-gray-700 bopomofo">{item.fullZhuyin}</td>
-                                                <td className="p-4 leading-relaxed text-sm">
-                                                    <div className="text-gray-800">{item.definition}</div>
-                                                    {item.sentence && (
-                                                        <div className="mt-1.5 text-gray-500 bg-gray-100/50 p-1.5 rounded-lg text-xs italic">
-                                                            <span className="font-bold not-italic mr-1">例:</span>
-                                                            <HighlightTerm term={item.sentence} targetChar={item.term} />
-                                                        </div>
-                                                    )}
-                                                </td>
+                                                <td className="p-4 text-gray-600 leading-relaxed text-sm">{item.definition}</td>
                                             </tr>
                                         ))
                                     ) : (
@@ -581,7 +393,6 @@
         
         // 輔助組件：在列表中高亮顯示
         const HighlightTerm = ({ term, targetChar }) => {
-            if (!term) return null;
             const parts = term.split(targetChar);
             return (
                 <span>
@@ -1126,32 +937,18 @@
             // Sound Effects
             const playSoundEffect = (type) => {
                  try {
-                     // 使用新提供的音效
-                    let audio;
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContext) return;
+                    const ctx = new AudioContext();
+                    const now = ctx.currentTime;
                     if (type === 'correct') {
-                         audio = new Audio('sounds/correct.mp3');
+                        const osc1 = ctx.createOscillator(); const gain1 = ctx.createGain();
+                        osc1.type = 'sine'; osc1.frequency.setValueAtTime(523.25, now); gain1.gain.setValueAtTime(0.1, now); gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5); osc1.connect(gain1); gain1.connect(ctx.destination); osc1.start(now); osc1.stop(now + 0.5);
+                        const osc2 = ctx.createOscillator(); const gain2 = ctx.createGain();
+                        osc2.type = 'sine'; osc2.frequency.setValueAtTime(659.25, now + 0.1); gain2.gain.setValueAtTime(0.1, now + 0.1); gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6); osc2.connect(gain2); gain2.connect(ctx.destination); osc2.start(now + 0.1); osc2.stop(now + 0.6);
                     } else {
-                         audio = new Audio('sounds/fail.mp3');
-                    }
-                    audio.volume = 0.4;
-                    const playPromise = audio.play();
-                    
-                    if (playPromise !== undefined) {
-                        playPromise.catch(e => {
-                            console.log("Audio file play failed, fallback to oscillator", e);
-                            // Fallback to oscillator if file doesn't exist or play fails
-                            const AudioContext = window.AudioContext || window.webkitAudioContext;
-                            if (!AudioContext) return;
-                            const ctx = new AudioContext();
-                            const now = ctx.currentTime;
-                            if (type === 'correct') {
-                                const osc1 = ctx.createOscillator(); const gain1 = ctx.createGain();
-                                osc1.type = 'sine'; osc1.frequency.setValueAtTime(523.25, now); gain1.gain.setValueAtTime(0.1, now); gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5); osc1.connect(gain1); gain1.connect(ctx.destination); osc1.start(now); osc1.stop(now + 0.5);
-                            } else {
-                                const osc = ctx.createOscillator(); const gain = ctx.createGain();
-                                osc.type = 'triangle'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(50, now + 0.3); gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3); osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.3);
-                            }
-                        });
+                        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                        osc.type = 'triangle'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(50, now + 0.3); gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3); osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.3);
                     }
                 } catch (e) { console.error("Audio play failed", e); }
             };
@@ -1276,9 +1073,6 @@
                     ></div>
                     {/* Overlay for Readability */}
                     <div className="fixed inset-0 z-0 bg-white/70 backdrop-blur-[2px]"></div>
-                    
-                    {/* 音樂播放器 */}
-                    <MusicWidget />
 
                     {/* Main Content Area */}
                     <div className="relative z-10">
@@ -1331,7 +1125,6 @@
                             <TableView 
                                 items={allItems}
                                 onMenu={() => setCurrentMode('menu')}
-                                favorites={favorites}
                             />
                         )}
                     </div>
