@@ -635,11 +635,11 @@
                                                 </td>
                                                 <td className="p-4 font-black text-red-600 bopomofo">{item.targetZhuyin}</td>
                                                 <td className="p-4 text-gray-700 bopomofo">{item.fullZhuyin}</td>
-                                                <td className="p-4 leading-relaxed">
-                                                    <div className="text-gray-800 text-lg font-medium mb-2">{item.definition}</div>
+                                                <td className="p-4 leading-relaxed text-sm">
+                                                    <div className="text-gray-800">{item.definition}</div>
                                                     {item.sentence && (
-                                                        <div className="mt-1.5 text-gray-600 bg-gray-100/50 p-3 rounded-lg text-base">
-                                                            <span className="font-bold text-gray-700 mr-1">例:</span>
+                                                        <div className="mt-1.5 text-gray-500 bg-gray-100/50 p-1.5 rounded-lg text-xs italic">
+                                                            <span className="font-bold not-italic mr-1">例:</span>
                                                             <HighlightTerm term={item.sentence} targetChar={item.term} />
                                                         </div>
                                                     )}
