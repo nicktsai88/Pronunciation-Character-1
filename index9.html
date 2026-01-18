@@ -189,14 +189,14 @@
 
     <script type="text/babel">
         // --- 1. 設定變數 (Configuration) ---
-        const MUSIC_CONFIG =  {
+        const MUSIC_CONFIG = {
             username: 'nicktsai88',
             repo: 'Music',
             folder: '' // 若在根目錄請留空，例如: ''
         };
 
         const { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef } = React;
-        const ITEMS_PER_PAGE = 20; // 改為 20 題一關
+        const ITEMS_PER_PAGE = 15; // 15題一關
         
         // --- Firebase Config Placeholder ---
         // 請在此處填入您的 Firebase 設定
@@ -625,50 +625,47 @@
                             </h1>
                             <div className="mt-6 flex flex-wrap items-center gap-3 p-4 bg-amber-100/80 backdrop-blur-sm rounded-xl border border-amber-200 shadow-sm">
                                 <span className="text-amber-900 font-bold text-lg">主公姓名：</span>
-                                <div className="relative flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <input 
-                                            type="text" 
-                                            value={userName}
-                                            onChange={(e) => !isLocked && setUserName(e.target.value)}
-                                            placeholder="請輸入姓名"
-                                            disabled={isLocked}
-                                            list="global-users-list" // Add datalist
-                                            className={`border-2 rounded-lg px-4 py-2 outline-none transition-all text-lg w-48 ${isLocked ? 'bg-amber-50 text-gray-500 border-amber-200 cursor-not-allowed font-bold' : (showNameWarning ? 'border-red-500 bg-red-50 ring-2 ring-red-200 animate-shake' : 'border-amber-300 focus:ring-4 focus:ring-amber-200 focus:border-amber-500 bg-white')}`}
-                                        />
-                                        <datalist id="global-users-list">
-                                            {globalUsers.map(u => <option key={u} value={u} />)}
-                                        </datalist>
+                                <div className="relative flex flex-wrap items-center gap-2">
+                                    <input 
+                                        type="text" 
+                                        value={userName}
+                                        onChange={(e) => !isLocked && setUserName(e.target.value)}
+                                        placeholder="請輸入姓名"
+                                        disabled={isLocked}
+                                        list="global-users-list" // Add datalist
+                                        className={`border-2 rounded-lg px-4 py-2 outline-none transition-all text-lg w-48 ${isLocked ? 'bg-amber-50 text-gray-500 border-amber-200 cursor-not-allowed font-bold' : (showNameWarning ? 'border-red-500 bg-red-50 ring-2 ring-red-200 animate-shake' : 'border-amber-300 focus:ring-4 focus:ring-amber-200 focus:border-amber-500 bg-white')}`}
+                                    />
+                                    <datalist id="global-users-list">
+                                        {globalUsers.map(u => <option key={u} value={u} />)}
+                                    </datalist>
 
-                                        {!isLocked ? (
-                                            <button onClick={onLogin} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-base font-bold flex items-center transition-colors shadow-sm transform active:scale-95">
-                                                <Icon path={icons.login} className="w-5 h-5 mr-2" fill="currentColor"/> 登入
+                                    {!isLocked ? (
+                                        <button onClick={onLogin} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-base font-bold flex items-center transition-colors shadow-sm transform active:scale-95">
+                                            <Icon path={icons.login} className="w-5 h-5 mr-2" fill="currentColor"/> 登入
+                                        </button>
+                                    ) : (
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-bold flex items-center border border-green-200">
+                                                <Icon path={icons.check} className="w-5 h-5 mr-1.5"/> 已登入
+                                            </span>
+                                            <button onClick={onLogout} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm">
+                                                <Icon path={icons.logout} className="w-4 h-4 mr-1.5" fill="currentColor"/> 登出
                                             </button>
-                                        ) : (
-                                            <div className="flex flex-wrap gap-2">
-                                                <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-bold flex items-center border border-green-200">
-                                                    <Icon path={icons.check} className="w-5 h-5 mr-1.5"/> 已登入
-                                                </span>
-                                                <button onClick={onLogout} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm">
-                                                    <Icon path={icons.logout} className="w-4 h-4 mr-1.5" fill="currentColor"/> 登出
-                                                </button>
-                                                <button onClick={onDeleteUser} className="bg-gray-400 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm group" title="刪除使用者">
-                                                    <Icon path={icons.userX} className="w-4 h-4 mr-1.5 group-hover:scale-110 transition-transform" fill="currentColor"/> 刪除
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    
+                                            <button onClick={onDeleteUser} className="bg-gray-400 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm group" title="刪除使用者">
+                                                <Icon path={icons.userX} className="w-4 h-4 mr-1.5 group-hover:scale-110 transition-transform" fill="currentColor"/> 刪除
+                                            </button>
+                                        </div>
+                                    )}
                                     {!isLocked && globalUsers.length > 0 && (
                                         <div className="w-full mt-2">
-                                            <p className="text-xs text-amber-700 font-bold mb-1">⚡ 快速登入 (所有挑戰者)：</p>
-                                            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 bg-white/30 rounded border border-amber-100">
-                                                {globalUsers.map(u => (
-                                                    <button key={u} onClick={() => onQuickLogin(u)} className="bg-white hover:bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center group">
-                                                        <Icon path={icons.lightning} className="w-3 h-3 mr-1 text-amber-400 group-hover:text-amber-600"/>
+                                            <p className="text-xs text-amber-700 font-bold mb-1">曾經的挑戰者：</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {globalUsers.slice(0, 3).map(u => (
+                                                    <button key={u} onClick={() => onQuickLogin(u)} className="bg-white/50 hover:bg-white text-amber-800 border border-amber-200 px-2 py-1 rounded text-xs transition-colors">
                                                         {u}
                                                     </button>
                                                 ))}
+                                                {globalUsers.length > 3 && <span className="text-xs text-amber-600 self-center">...</span>}
                                             </div>
                                         </div>
                                     )}
@@ -1405,8 +1402,7 @@
                 setFirebaseStatus('loading');
                 setFirebaseStatusText('讀取資料中...');
 
-                // Important: Added updateDoc to destructuring to fix registration error
-                const { doc, onSnapshot, setDoc, getDoc, arrayUnion, updateDoc } = window.FirebaseApp;
+                const { doc, onSnapshot, setDoc, getDoc, arrayUnion } = window.FirebaseApp;
                 const userDocRef = doc(db, COLLECTION_NAME, `user_${userName}`);
                 const globalRef = doc(db, COLLECTION_NAME, 'global_users');
 
