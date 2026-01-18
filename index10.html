@@ -189,14 +189,14 @@
 
     <script type="text/babel">
         // --- 1. 設定變數 (Configuration) ---
-        const MUSIC_CONFIG = {
+        const MUSIC_CONFIG =  {
             username: 'nicktsai88',
             repo: 'Music',
             folder: '' // 若在根目錄請留空，例如: ''
         };
 
         const { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef } = React;
-        const ITEMS_PER_PAGE = 20; // 20題一關
+        const ITEMS_PER_PAGE = 20; // 改為 20 題一關
         
         // --- Firebase Config Placeholder ---
         // 請在此處填入您的 Firebase 設定
@@ -441,7 +441,7 @@
             };
         });
 
-        // --- Top Music Bar (Centered) ---
+        // --- Top Music Bar ---
         const MusicBar = forwardRef((props, ref) => {
             const [playlist, setPlaylist] = useState([]);
             const [isPlaying, setIsPlaying] = useState(false);
@@ -548,36 +548,36 @@
             const currentTrack = playlist[currentIndex];
 
             return (
-                <div className="fixed top-2 left-1/2 transform -translate-x-1/2 z-50 w-[95%] max-w-lg bg-white/90 backdrop-blur-md text-amber-800 shadow-xl border border-amber-200 rounded-full px-4 py-2 flex items-center justify-between h-14 transition-all hover:scale-[1.01] hover:bg-white hover:shadow-2xl music-bar">
+                <div className="sticky top-0 z-50 w-full bg-amber-500 text-white shadow-md border-b border-amber-600 px-4 py-2 flex items-center justify-between music-bar h-14">
                     {/* Left: Controls */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <button onClick={handlePrev} className="p-1.5 hover:bg-amber-100 rounded-full transition-colors text-amber-600">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <button onClick={handlePrev} className="p-1.5 hover:bg-amber-600 rounded-full transition-colors">
                             <Icon path={icons.left} className="w-5 h-5" />
                         </button>
-                        <button onClick={handlePlayPause} className="p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors shadow-sm mx-1">
-                            <Icon path={isPlaying ? icons.pause : icons.play} className="w-4 h-4 fill-current" />
+                        <button onClick={handlePlayPause} className="p-2 bg-white text-amber-600 rounded-full hover:bg-amber-100 transition-colors shadow-sm">
+                            <Icon path={isPlaying ? icons.pause : icons.play} className="w-5 h-5 fill-current" />
                         </button>
-                        <button onClick={() => handleNext(false)} className="p-1.5 hover:bg-amber-100 rounded-full transition-colors text-amber-600">
+                        <button onClick={() => handleNext(false)} className="p-1.5 hover:bg-amber-600 rounded-full transition-colors">
                             <Icon path={icons.skipForward} className="w-5 h-5" />
                         </button>
                     </div>
 
                     {/* Center: Track Name (Marquee) */}
-                    <div className="flex-1 mx-3 overflow-hidden relative h-6">
+                    <div className="flex-1 mx-4 overflow-hidden relative h-6">
                         {currentTrack ? (
                             <div className="absolute w-full flex items-center h-full">
-                                <div className={`whitespace-nowrap font-bold text-sm ${currentTrack.title.length > 12 ? 'animate-marquee' : 'text-center w-full'}`}>
+                                <div className={`whitespace-nowrap font-bold text-sm md:text-base ${currentTrack.title.length > 15 ? 'animate-marquee' : 'text-center w-full'}`}>
                                     {currentTrack.title}
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center text-xs opacity-60">Loading Music...</div>
+                            <div className="text-center text-sm opacity-80">Loading Music...</div>
                         )}
                     </div>
 
                     {/* Right: Volume */}
-                    <div className="flex items-center gap-2 flex-shrink-0 w-20">
-                        <Icon path={volume === 0 ? icons.volumeX : icons.volume} className="w-4 h-4 opacity-50" />
+                    <div className="flex items-center gap-2 flex-shrink-0 w-24 md:w-32">
+                        <Icon path={volume === 0 ? icons.volumeX : icons.volume} className="w-4 h-4 opacity-80" />
                         <input 
                             type="range" 
                             min="0" 
@@ -585,7 +585,7 @@
                             step="0.01" 
                             value={volume} 
                             onChange={handleVolumeChange}
-                            className="w-full h-1 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                            className="w-full h-1 bg-amber-300 rounded-lg appearance-none cursor-pointer"
                         />
                     </div>
                 </div>
@@ -608,9 +608,9 @@
             }[firebaseStatus] || 'status-loading';
 
             return (
-                <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in-up relative pt-20"> {/* Added pt-20 for music bar */}
+                <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in-up relative">
                     {/* Cloud Status Indicator */}
-                    <div className="absolute top-24 right-4 md:top-24 md:right-0 flex items-center bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 border border-gray-200 shadow-sm cloud-status z-20">
+                    <div className="absolute top-2 right-4 md:top-0 md:right-0 flex items-center bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 border border-gray-200 shadow-sm cloud-status z-20">
                         <span className={`status-dot ${statusClass}`}></span>
                         {firebaseStatusText}
                     </div>
@@ -659,15 +659,6 @@
                                         )}
                                     </div>
                                     
-                                    {!isLocked && lastUser && (
-                                        <div className="w-full mt-2 mb-1">
-                                            <button onClick={() => onQuickLogin(lastUser)} className="w-full sm:w-auto bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center transition-colors shadow-sm">
-                                                <Icon path={icons.lightning} className="w-4 h-4 mr-2" fill="currentColor"/> 
-                                                快速登入: {lastUser}
-                                            </button>
-                                        </div>
-                                    )}
-
                                     {!isLocked && globalUsers.length > 0 && (
                                         <div className="w-full mt-2">
                                             <p className="text-xs text-amber-700 font-bold mb-1">⚡ 快速登入 (所有挑戰者)：</p>
@@ -692,6 +683,7 @@
                         </div>
                         <div className="flex gap-3 w-full md:w-auto">
                             <button onClick={onViewHistory} className="flex-1 md:flex-none justify-center flex items-center px-5 py-3 bg-white/90 backdrop-blur text-gray-700 rounded-xl shadow-sm hover:shadow-md hover:bg-white border-2 border-gray-200 font-bold text-lg transition-all"><Icon path={icons.history} className="w-5 h-5 mr-2"/> 戰績</button>
+                            <button onClick={onViewMistakes} className="flex-1 md:flex-none justify-center flex items-center px-5 py-3 bg-red-50/90 backdrop-blur text-red-700 rounded-xl shadow-sm hover:shadow-md hover:bg-red-100 border-2 border-red-200 font-bold text-lg transition-all"><Icon path={icons.alert} className="w-5 h-5 mr-2"/> 錯題 ({mistakeLog.length})</button>
                         </div>
                     </div>
 
@@ -705,7 +697,7 @@
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* 錦囊收藏卡片 */}
                         <div className="bg-gradient-to-br from-red-50/90 to-orange-50/90 backdrop-blur p-8 rounded-2xl shadow-sm border-2 border-red-100 flex flex-col justify-between hover:border-red-200 transition-colors">
                             <div className="flex items-start mb-6">
@@ -737,36 +729,6 @@
                                 <button onClick={() => onStartLearn('精選字音')} className="flex items-center justify-center py-3 bg-amber-50 text-amber-900 rounded-xl hover:bg-amber-100 font-bold text-lg border-2 border-amber-200 transition-colors"><Icon path={icons.book} className="w-5 h-5 mr-2"/> 研讀</button>
                                 <button onClick={() => onStartQuiz('精選字音')} className="flex items-center justify-center py-3 bg-amber-600 text-white rounded-xl shadow-lg hover:bg-amber-700 font-bold text-lg transform active:scale-95 transition-all"><Icon path={icons.play} className="w-5 h-5 mr-2"/> 開始挑戰</button>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* 新增的錯題軍令狀大型卡片 */}
-                    <div className="mb-12">
-                        <div 
-                            className="bg-white/95 backdrop-blur p-8 rounded-2xl shadow-md hover:shadow-xl transition-all border-l-8 border-red-500 flex flex-col md:flex-row items-center justify-between group cursor-pointer relative overflow-hidden" 
-                            onClick={onViewMistakes}
-                        >
-                             <div className="absolute right-0 top-0 opacity-5 transform translate-x-10 -translate-y-10">
-                                 <Icon path={icons.alert} className="w-48 h-48 text-red-600" fill="currentColor" />
-                             </div>
-                             <div className="flex items-center gap-6 relative z-10">
-                                 <div className="bg-red-100 p-5 rounded-full text-red-600 group-hover:scale-110 transition-transform shadow-inner">
-                                     <Icon path={icons.alert} className="w-12 h-12" />
-                                 </div>
-                                 <div>
-                                     <h3 className="text-3xl font-black text-gray-800 tracking-tight">錯題軍令狀</h3>
-                                     <p className="text-gray-600 font-medium mt-2 text-lg">
-                                        目前累積 <span className="text-red-600 font-black text-3xl mx-1">{mistakeLog.length}</span> 道錯題
-                                     </p>
-                                     <p className="text-sm text-gray-400 mt-1">針對弱點，反覆練習直至精通</p>
-                                 </div>
-                             </div>
-                             <div className="mt-6 md:mt-0 relative z-10 w-full md:w-auto">
-                                 <button className="w-full md:w-auto px-8 py-4 bg-red-600 text-white rounded-xl shadow-lg hover:bg-red-700 font-black text-xl flex items-center justify-center gap-3 group-hover:ring-4 ring-red-200 transition-all transform group-active:scale-95">
-                                    <Icon path={icons.book} className="w-6 h-6" />
-                                    進入複習
-                                 </button>
-                             </div>
                         </div>
                     </div>
                     
@@ -955,7 +917,7 @@
             items, learnPage, setLearnPage, favorites, toggleFavorite, completedDays, onMenu 
         }) => (
             <div className="max-w-4xl mx-auto px-4 py-6">
-                <div className="bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-sm mb-8 flex flex-col md:flex-row justify-between items-center sticky top-14 z-30 border-b-2 border-amber-200 pt-20"> {/* Added pt-20 */}
+                <div className="bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-sm mb-8 flex flex-col md:flex-row justify-between items-center sticky top-14 z-30 border-b-2 border-amber-200">
                     <div className="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto">
                         <button onClick={onMenu} className="text-gray-500 hover:text-gray-900 flex items-center whitespace-nowrap bg-gray-100 px-3 py-2 rounded-lg font-bold"><Icon path={icons.menu} className="w-5 h-5 mr-2"/> 選單</button>
                         <h2 className="text-2xl font-black flex items-center whitespace-nowrap text-amber-900">
@@ -1059,7 +1021,7 @@
 
             if (showResult) {
                  return (
-                    <div className="max-w-2xl mx-auto pt-20 px-4 animate-fade-in-up"> {/* Added pt-20 */}
+                    <div className="max-w-2xl mx-auto pt-10 px-4 animate-fade-in-up">
                         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden text-center border-4 border-amber-400">
                             <div className="bg-amber-500 p-10 text-white relative overflow-hidden">
                                 <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
@@ -1090,8 +1052,8 @@
             }
 
             return (
-                <div className="max-w-4xl mx-auto pb-20 px-4 pt-20"> {/* Added pt-20 */}
-                    <div className="bg-white/95 backdrop-blur shadow-sm p-4 rounded-b-2xl mb-8 sticky top-14 z-30 border-t-4 border-amber-500 flex flex-col md:flex-row justify-between items-center transition-all mt-4"> {/* Added mt-4 */}
+                <div className="max-w-4xl mx-auto pb-20 px-4">
+                    <div className="bg-white/95 backdrop-blur shadow-sm p-4 rounded-b-2xl mb-8 sticky top-14 z-30 border-t-4 border-amber-500 flex flex-col md:flex-row justify-between items-center transition-all">
                         <div className="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto justify-between md:justify-start">
                             <button onClick={onMenu} className="text-gray-500 text-sm flex items-center hover:text-red-600 font-bold bg-gray-100 px-3 py-2 rounded-lg transition-colors"><Icon path={icons.left} className="w-4 h-4 mr-1"/> 撤退</button>
                             <div className="font-bold text-xl flex items-center gap-3">
@@ -1183,12 +1145,6 @@
                                                 <div className="text-gray-600 text-lg italic"><span className="font-bold not-italic text-gray-500">例句：</span>{q.sentence}</div>
                                             </div>
                                         </div>
-                                        {!q.isCorrect && (
-                                             <div className="mt-4 bg-red-100 text-red-700 px-4 py-2 rounded-lg font-bold flex items-center inline-block w-fit">
-                                                 <Icon path={icons.book} className="w-5 h-5 mr-2"/>
-                                                 已加入錯題本，請多加複習！
-                                             </div>
-                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1203,7 +1159,7 @@
             
             if (selectedLog) {
                 return (
-                    <div className="w-full max-w-4xl mx-auto bg-white/95 backdrop-blur-md min-h-screen p-6 md:p-8 shadow-2xl animate-fade-in-up pt-20"> {/* Added pt-20 */}
+                    <div className="w-full max-w-4xl mx-auto bg-white/95 backdrop-blur-md min-h-screen p-6 md:p-8 shadow-2xl animate-fade-in-up">
                         <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-200 sticky top-14 bg-white z-20 pt-4">
                             <button onClick={() => setSelectedLog(null)} className="flex items-center text-gray-500 hover:text-amber-800 font-bold text-lg px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"><Icon path={icons.left} className="w-6 h-6 mr-1"/> 返回</button>
                             <div className="text-right">
@@ -1243,7 +1199,7 @@
                 )
             }
             return (
-                <div className="max-w-4xl mx-auto px-4 py-8 pt-20"> {/* Added pt-20 */}
+                <div className="max-w-4xl mx-auto px-4 py-8">
                     <div className="flex items-center mb-8">
                         <button onClick={onMenu} className="mr-4 p-3 bg-white rounded-xl shadow border border-gray-200 hover:bg-gray-50"><Icon path={icons.left} className="w-5 h-5"/></button>
                         <h2 className="text-3xl font-black text-gray-800 flex items-center gap-3">📜 歷史戰績 <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{historyLog.length} 場</span></h2>
@@ -1298,9 +1254,9 @@
             );
         };
 
-        const MistakeView = ({ mistakes, mistakeLog, setMistakeLog, onMenu, onReviewAll, onClearMistakes, onDeleteSingleMistake }) => {
+        const MistakeView = ({ mistakes, mistakeLog, setMistakeLog, onMenu, onReviewAll, onClearMistakes }) => {
             return (
-                <div className="max-w-4xl mx-auto px-4 py-8 pt-20"> {/* Added pt-20 */}
+                <div className="max-w-4xl mx-auto px-4 py-8">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
                         <div className="flex items-center">
                             <button onClick={onMenu} className="mr-4 p-3 bg-white rounded-xl shadow border border-gray-200 hover:bg-gray-50"><Icon path={icons.left} className="w-5 h-5"/></button>
@@ -1325,7 +1281,7 @@
                             {mistakes.map(item => { 
                                 const log = mistakeLog.find(m => m.id === item.id); 
                                 return (
-                                    <div key={item.id} className="bg-white/95 backdrop-blur-sm p-6 rounded-2xl shadow-sm border-l-8 border-red-400 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-shadow relative">
+                                    <div key={item.id} className="bg-white/95 backdrop-blur-sm p-6 rounded-2xl shadow-sm border-l-8 border-red-400 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-shadow">
                                         <div>
                                             <div className="flex items-center gap-3 mb-2">
                                                 <h3 className="text-2xl font-black text-gray-800">
@@ -1336,13 +1292,8 @@
                                             <div className="text-lg font-bold text-red-600 mb-1 bopomofo">{item.targetZhuyin}</div>
                                             <p className="text-gray-600 text-base font-medium">{item.definition}</p>
                                         </div>
-                                        <div className="flex flex-col items-end gap-2">
-                                            <div className="text-xs text-gray-400 text-right font-mono">
-                                                最後錯誤:<br/>{new Date(log.lastMissed).toLocaleDateString()}
-                                            </div>
-                                            <button onClick={() => onDeleteSingleMistake(item.id)} className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors" title="移除此題">
-                                                <Icon path={icons.trash} className="w-5 h-5" />
-                                            </button>
+                                        <div className="text-xs text-gray-400 text-right md:w-32 flex-shrink-0 font-mono">
+                                            最後錯誤:<br/>{new Date(log.lastMissed).toLocaleDateString()}
                                         </div>
                                     </div>
                                 ); 
@@ -1591,14 +1542,6 @@
                     saveData('mistakeLog', []);
                 }
             };
-
-            const handleDeleteSingleMistake = (id) => {
-                if(confirm('確定要移除這道錯題嗎？(這表示您已經學會了)')) {
-                    const newMistakeLog = mistakeLog.filter(m => m.id !== id);
-                    setMistakeLog(newMistakeLog);
-                    saveData('mistakeLog', newMistakeLog);
-                }
-            };
             
             // Sound Effects
             const playSoundEffect = (type) => {
@@ -1696,7 +1639,6 @@
                     } else {
                          confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 }, scalar: 0.7 });
                     }
-                    // 注意：答對時，刻意不更新 mistakeLog，以保留錯題紀錄供反覆練習。
                 } else {
                     setCombo(0);
                     playSoundEffect('wrong');
@@ -1818,7 +1760,6 @@
                                 onMenu={() => setCurrentMode('menu')}
                                 onReviewAll={() => handleStartQuiz(null, 0, true)}
                                 onClearMistakes={handleClearMistakes}
-                                onDeleteSingleMistake={handleDeleteSingleMistake}
                             />
                         )}
                         {currentMode === 'table' && (
