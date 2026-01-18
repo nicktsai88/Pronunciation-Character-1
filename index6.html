@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -75,34 +76,6 @@
         .bopomofo {
             font-family: "BpmfGen", "HanWangMingMedium", system-ui, sans-serif;
         }
-
-        /* 列印專用樣式 */
-        @media print {
-            @page {
-                size: A4 portrait;
-                margin: 1cm;
-            }
-            body {
-                background-color: white;
-                overflow: visible;
-            }
-            /* 隱藏非列印元素 */
-            .no-print, .music-bar {
-                display: none !important;
-            }
-            .print-only {
-                display: block !important;
-            }
-            /* 強制背景圖形列印 (針對 Chrome/Edge) */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-        }
-        
-        .print-only {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -115,30 +88,6 @@
         // Storage Key Prefix
         const STORAGE_PREFIX = "Pronunciation_Character_1";
         const MUSIC_STORAGE_KEY = `${STORAGE_PREFIX}_MusicState`;
-
-        // --- 安全的 localStorage 封裝 (防止隱私模式報錯) ---
-        const safeLocalStorage = {
-            getItem: (key) => {
-                try { return localStorage.getItem(key); } catch (e) { return null; }
-            },
-            setItem: (key, value) => {
-                try { localStorage.setItem(key, value); } catch (e) { console.warn('Storage failed', e); }
-            },
-            removeItem: (key) => {
-                try { localStorage.removeItem(key); } catch (e) { }
-            }
-        };
-        const safeSessionStorage = {
-            getItem: (key) => {
-                try { return sessionStorage.getItem(key); } catch (e) { return null; }
-            },
-            setItem: (key, value) => {
-                try { sessionStorage.setItem(key, value); } catch (e) { }
-            },
-            removeItem: (key) => {
-                try { sessionStorage.removeItem(key); } catch (e) { }
-            }
-        };
 
         // --- 音樂設定 ---
         const PLAYLIST = [
@@ -273,8 +222,7 @@
             logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>,
             userX: <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></>,
             search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
-            list: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
-            printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>
+            list: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>
         };
 
         const Icon = ({ path, className, fill = "none" }) => (
@@ -477,7 +425,7 @@
             };
 
             return (
-                <div className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b-2 border-amber-200 shadow-sm px-4 py-2 flex items-center justify-between music-bar">
+                <div className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b-2 border-amber-200 shadow-sm px-4 py-2 flex items-center justify-between">
                     {/* Track Info */}
                     <div className="flex items-center gap-3">
                        <div className={`w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center border border-amber-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
@@ -510,7 +458,7 @@
 
         const MenuView = ({ 
             userName, setUserName, showNameWarning, mistakeLog, favorites, parsedData, 
-            onStartLearn, onStartQuiz, onViewHistory, onViewMistakes, onViewTable, onPrintExam,
+            onStartLearn, onStartQuiz, onViewHistory, onViewMistakes, onViewTable,
             onLogin, isLocked, onQuickLogin, lastUser, onLogout, onDeleteUser
         }) => (
             <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in-up">
@@ -565,13 +513,10 @@
                     </div>
                 </div>
 
-                {/* 一覽表按鈕與列印按鈕 */}
-                <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 一覽表按鈕 */}
+                <div className="mb-8">
                     <button onClick={onViewTable} className="w-full py-4 bg-purple-600/90 backdrop-blur hover:bg-purple-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-purple-400 group">
-                        <Icon path={icons.list} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform"/> 字音一覽表
-                    </button>
-                    <button onClick={onPrintExam} className="w-full py-4 bg-blue-600/90 backdrop-blur hover:bg-blue-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-blue-400 group">
-                        <Icon path={icons.printer} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform" fill="none" /> 🖨️ 列印考卷 (A4)
+                        <Icon path={icons.list} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform"/> 字音一覽表 (快速查詢)
                     </button>
                 </div>
 
@@ -615,75 +560,6 @@
                 </div>
             </div>
         );
-
-        // --- Print Exam View ---
-        const PrintExamView = ({ items, onMenu }) => {
-            useEffect(() => {
-                // 自動開啟列印對話框
-                setTimeout(() => {
-                    window.print();
-                }, 500);
-            }, []);
-
-            return (
-                <div className="print-exam-container bg-white min-h-screen text-black">
-                    <div className="no-print p-4 bg-gray-100 border-b flex justify-between items-center fixed top-0 w-full z-50">
-                        <button onClick={onMenu} className="flex items-center text-gray-600 hover:text-gray-900 font-bold bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors shadow-sm">
-                            <Icon path={icons.left} className="w-5 h-5 mr-2"/> 返回
-                        </button>
-                        <div className="font-bold text-gray-700">準備列印... (如未彈出請按 Ctrl+P)</div>
-                        <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">
-                            手動列印
-                        </button>
-                    </div>
-                    
-                    <div className="max-w-[210mm] mx-auto pt-20 pb-10 px-8 print-only" style={{ display: 'block' }}>
-                        <div className="text-center mb-6 border-b-2 border-black pb-4">
-                            <h1 className="text-3xl font-black mb-4 font-serif">字音大師 - 易混淆字音手寫測驗</h1>
-                            <div className="flex justify-between text-lg font-bold">
-                                <span>班級：__________</span>
-                                <span>座號：__________</span>
-                                <span>姓名：__________</span>
-                                <span>得分：__________</span>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-x-12 gap-y-4 text-lg">
-                            {items.map((item, index) => {
-                                // 處理題目顯示：將目標字替換為「注音」格式
-                                const parts = item.term.split(item.targetChar);
-                                const questionText = (
-                                    <span>
-                                        {parts.map((part, i) => (
-                                            <React.Fragment key={i}>
-                                                {part}
-                                                {i < parts.length - 1 && (
-                                                    <span className="font-bold font-serif mx-1">「{item.targetZhuyin}」</span>
-                                                )}
-                                            </React.Fragment>
-                                        ))}
-                                    </span>
-                                );
-
-                                return (
-                                    <div key={item.id} className="flex items-end border-b border-gray-300 pb-2 break-inside-avoid">
-                                        <div className="w-8 font-bold text-gray-500">{item.id}.</div>
-                                        <div className="flex-1 font-medium tracking-wide">
-                                            {questionText}
-                                        </div>
-                                        <div className="w-16 h-16 border-2 border-black ml-2 rounded-md bg-white"></div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        
-                        <div className="mt-8 text-center text-sm text-gray-400">
-                            - 試卷結束 - 共 {items.length} 題
-                        </div>
-                    </div>
-                </div>
-            );
-        };
 
         // TableView 組件
         const TableView = ({ items, onMenu, favorites, toggleFavorite }) => {
@@ -1214,7 +1090,7 @@
                     
                     {mistakes.length > 0 && (
                         <div className="text-center mt-12 pb-10">
-                            <button onClick={() => {if(confirm('確定清空錯題本？這將移除所有錯誤紀錄。')) { setMistakeLog([]); safeLocalStorage.setItem(`${STORAGE_PREFIX}_Mistakes`, '[]'); } }} className="text-gray-400 hover:text-gray-600 text-sm hover:bg-gray-100/80 px-4 py-2 rounded-lg transition-colors">
+                            <button onClick={() => {if(confirm('確定清空錯題本？這將移除所有錯誤紀錄。')) { setMistakeLog([]); localStorage.setItem(`${STORAGE_PREFIX}_Mistakes`, '[]'); } }} className="text-gray-400 hover:text-gray-600 text-sm hover:bg-gray-100/80 px-4 py-2 rounded-lg transition-colors">
                                 清空錯題本
                             </button>
                         </div>
@@ -1242,7 +1118,7 @@
             const KEY_MISTAKES = `${STORAGE_PREFIX}_Mistakes`;
             const KEY_COMPLETED = `${STORAGE_PREFIX}_CompletedDays`;
             
-            const [lastUser, setLastUser] = useState(() => safeLocalStorage.getItem(KEY_LAST_USER));
+            const [lastUser, setLastUser] = useState(() => localStorage.getItem(KEY_LAST_USER));
 
             // 背景圖狀態
             const [bgImage, setBgImage] = useState('');
@@ -1255,17 +1131,17 @@
 
             // 狀態初始化與 F5 保護 (Session Restore)
             useEffect(() => {
-                const savedSessionUser = safeSessionStorage.getItem(`${STORAGE_PREFIX}_SessionUser`);
+                const savedSessionUser = sessionStorage.getItem(`${STORAGE_PREFIX}_SessionUser`);
                 if (savedSessionUser) {
                     setUserName(savedSessionUser);
                     setIsLocked(true);
                 }
             }, []);
 
-            const [favorites, setFavorites] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_FAVORITES)) || []);
-            const [historyLog, setHistoryLog] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_HISTORY)) || []);
-            const [mistakeLog, setMistakeLog] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_MISTAKES)) || []);
-            const [completedDays, setCompletedDays] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_COMPLETED)) || []);
+            const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem(KEY_FAVORITES)) || []);
+            const [historyLog, setHistoryLog] = useState(() => JSON.parse(localStorage.getItem(KEY_HISTORY)) || []);
+            const [mistakeLog, setMistakeLog] = useState(() => JSON.parse(localStorage.getItem(KEY_MISTAKES)) || []);
+            const [completedDays, setCompletedDays] = useState(() => JSON.parse(localStorage.getItem(KEY_COMPLETED)) || []);
             const [learnPage, setLearnPage] = useState(0);
 
             const [quizQuestions, setQuizQuestions] = useState([]);
@@ -1274,21 +1150,21 @@
             const [quizPage, setQuizPage] = useState(0);
 
             // 存儲副作用
-            useEffect(() => { safeLocalStorage.setItem(KEY_FAVORITES, JSON.stringify(favorites)); }, [favorites]);
-            useEffect(() => { safeLocalStorage.setItem(KEY_HISTORY, JSON.stringify(historyLog)); }, [historyLog]);
+            useEffect(() => { localStorage.setItem(KEY_FAVORITES, JSON.stringify(favorites)); }, [favorites]);
+            useEffect(() => { localStorage.setItem(KEY_HISTORY, JSON.stringify(historyLog)); }, [historyLog]);
             useEffect(() => { 
-                if (mistakeLog.length > 0) safeLocalStorage.setItem(KEY_MISTAKES, JSON.stringify(mistakeLog)); 
-                else if (mistakeLog.length === 0 && safeLocalStorage.getItem(KEY_MISTAKES)) safeLocalStorage.removeItem(KEY_MISTAKES);
+                if (mistakeLog.length > 0) localStorage.setItem(KEY_MISTAKES, JSON.stringify(mistakeLog)); 
+                else if (mistakeLog.length === 0 && localStorage.getItem(KEY_MISTAKES)) localStorage.removeItem(KEY_MISTAKES);
             }, [mistakeLog]);
-            useEffect(() => { safeLocalStorage.setItem(KEY_COMPLETED, JSON.stringify(completedDays)); }, [completedDays]);
+            useEffect(() => { localStorage.setItem(KEY_COMPLETED, JSON.stringify(completedDays)); }, [completedDays]);
             
             // Login Handlers
             const handleLogin = () => {
                 if (userName.trim()) {
                     setIsLocked(true);
                     setShowNameWarning(false);
-                    safeLocalStorage.setItem(KEY_LAST_USER, userName);
-                    safeSessionStorage.setItem(`${STORAGE_PREFIX}_SessionUser`, userName); 
+                    localStorage.setItem(KEY_LAST_USER, userName);
+                    sessionStorage.setItem(`${STORAGE_PREFIX}_SessionUser`, userName); 
                     setLastUser(userName);
                 } else {
                     setShowNameWarning(true);
@@ -1296,12 +1172,12 @@
             };
 
             const handleQuickLogin = () => {
-                const storedUser = safeLocalStorage.getItem(KEY_LAST_USER);
+                const storedUser = localStorage.getItem(KEY_LAST_USER);
                 if (storedUser) {
                     setUserName(storedUser);
                     setIsLocked(true);
                     setShowNameWarning(false);
-                    safeSessionStorage.setItem(`${STORAGE_PREFIX}_SessionUser`, storedUser);
+                    sessionStorage.setItem(`${STORAGE_PREFIX}_SessionUser`, storedUser);
                 }
             };
 
@@ -1309,19 +1185,19 @@
                 if(confirm('確定要登出嗎？')) {
                     setIsLocked(false);
                     setUserName('');
-                    safeSessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`);
+                    sessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`);
                 }
             };
 
             const handleDeleteUser = () => {
                 if (confirm('【危險操作】確定要刪除這位使用者的所有資料嗎？')) {
                     if (confirm('再次確認：這將會清除所有學習紀錄、收藏和錯題本，且無法復原！確定要執行嗎？')) {
-                        safeLocalStorage.removeItem(KEY_LAST_USER);
-                        safeLocalStorage.removeItem(KEY_FAVORITES);
-                        safeLocalStorage.removeItem(KEY_HISTORY);
-                        safeLocalStorage.removeItem(KEY_MISTAKES);
-                        safeLocalStorage.removeItem(KEY_COMPLETED);
-                        safeSessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`);
+                        localStorage.removeItem(KEY_LAST_USER);
+                        localStorage.removeItem(KEY_FAVORITES);
+                        localStorage.removeItem(KEY_HISTORY);
+                        localStorage.removeItem(KEY_MISTAKES);
+                        localStorage.removeItem(KEY_COMPLETED);
+                        sessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`);
                         
                         setFavorites([]);
                         setHistoryLog([]);
@@ -1484,14 +1360,14 @@
                 <div className="min-h-screen font-sans selection:bg-amber-200 selection:text-amber-900 relative">
                     {/* Background Layer */}
                     <div 
-                        className="fixed inset-0 z-0 bg-cover bg-center transition-all duration-1000 no-print"
+                        className="fixed inset-0 z-0 bg-cover bg-center transition-all duration-1000"
                         style={{ 
                             backgroundImage: `url('${bgImage}')`,
                             backgroundColor: '#fcf9f2' 
                         }}
                     ></div>
                     {/* Overlay for Readability */}
-                    <div className="fixed inset-0 z-0 bg-white/70 backdrop-blur-[2px] no-print"></div>
+                    <div className="fixed inset-0 z-0 bg-white/70 backdrop-blur-[2px]"></div>
                     
                     {/* 音樂播放器 (現在位於頂端) */}
                     <MusicBar />
@@ -1507,7 +1383,6 @@
                                 onViewHistory={() => setCurrentMode('history')}
                                 onViewMistakes={() => setCurrentMode('mistakes')}
                                 onViewTable={() => setCurrentMode('table')}
-                                onPrintExam={() => setCurrentMode('print')}
                                 onLogin={handleLogin} isLocked={isLocked} onQuickLogin={handleQuickLogin} lastUser={lastUser}
                                 onLogout={handleLogout} onDeleteUser={handleDeleteUser}
                             />
@@ -1550,12 +1425,6 @@
                                 onMenu={() => setCurrentMode('menu')}
                                 favorites={favorites}
                                 toggleFavorite={toggleFavorite}
-                            />
-                        )}
-                        {currentMode === 'print' && (
-                            <PrintExamView 
-                                items={allItems}
-                                onMenu={() => setCurrentMode('menu')}
                             />
                         )}
                     </div>
