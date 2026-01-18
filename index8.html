@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>字音大師 (易混淆字音版) - 雲端同步版</title>
+    <title>字音大師 (易混淆字音版)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,31 +17,6 @@
 
     <!-- Canvas Confetti -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
-    <!-- Firebase SDKs (v11.6.1) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Expose Firebase to global scope for React
-        window.FirebaseApp = {
-            initializeApp,
-            getAuth,
-            signInAnonymously,
-            onAuthStateChanged,
-            getFirestore,
-            collection,
-            doc,
-            setDoc,
-            getDoc,
-            updateDoc,
-            onSnapshot,
-            arrayUnion,
-            arrayRemove,
-            serverTimestamp
-        };
-    </script>
 
     <style>
         /* 基礎設定 */
@@ -86,24 +61,6 @@
             display: inline-block;
             white-space: nowrap;
             animation: marquee 25s linear infinite;
-        }
-
-        /* 雲端狀態燈號 */
-        .status-dot {
-            height: 8px;
-            width: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 6px;
-        }
-        .status-loading { background-color: #fbbf24; box-shadow: 0 0 5px #fbbf24; animation: pulse 1.5s infinite; }
-        .status-success { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
-        .status-error { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
-        
-        @keyframes pulse {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
         }
 
         /* 圖片容器互動 */
@@ -161,7 +118,7 @@
                 font-size: 10pt; /* 整體字體縮小 */
             }
             /* 隱藏非列印元素 */
-            .no-print, .music-bar, .cloud-status {
+            .no-print, .music-bar {
                 display: none !important;
             }
             .print-only {
@@ -198,22 +155,11 @@
         const { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef } = React;
         const ITEMS_PER_PAGE = 15; // 15題一關
         
-        // --- Firebase Config Placeholder ---
-        // 請在此處填入您的 Firebase 設定
-        const firebaseConfig = {
-  apiKey: "AIzaSyAxQFt76ZPXE7d0i1XeNZ1yiiD2WYNIfHs",
-  authDomain: "chinese-learning-47f4d.firebaseapp.com",
-  projectId: "chinese-learning-47f4d",
-  storageBucket: "chinese-learning-47f4d.firebasestorage.app",
-  messagingSenderId: "76289812052",
-  appId: "1:76289812052:web:898384a916f9f341f62fc1"
-};
+        // Storage Key Prefix
+        const STORAGE_PREFIX = "Pronunciation_Character_1";
+        const MUSIC_STORAGE_KEY = `${STORAGE_PREFIX}_MusicState_V2`; // Update key version
 
-        // Storage Key Prefix -> Collection Name
-        const COLLECTION_NAME = "Pronunciation_Character_1";
-        const STORAGE_PREFIX = COLLECTION_NAME; // 保留此前綴用於本地 Session/LastUser
-        
-        // --- 安全的 localStorage 封裝 (僅用於 LastUser 與 Session) ---
+        // --- 安全的 localStorage 封裝 (防止隱私模式報錯) ---
         const safeLocalStorage = {
             getItem: (key) => {
                 try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -340,7 +286,7 @@
             [98, "閱聽大眾", "閱", "ㄩㄝˋ", "ㄩㄝˋ ㄊㄧㄥ ㄉㄚˋ ㄓㄨㄥˋ", "觀看。", "媒體應對閱聽大眾負責，報導真實新聞。", "一群不同年齡、性別的人們（大眾）正專注地看著前方（像是在看電視或聽廣播），表情各異。"]
         ];
 
-        // --- Icons ---
+        // --- Icons (Fixed for JSX Fragments) ---
         const icons = {
             check: <polyline points="20 6 9 17 4 12" />,
             play: <polygon points="5 3 19 12 5 21 5 3" />,
@@ -361,8 +307,7 @@
             book: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
             menu: <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
             volume: <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />,
-            volumeX: <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>,
-            cloud: <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+            volumeX: <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>
         };
 
         const Icon = ({ path, className, fill = "none" }) => (
@@ -441,7 +386,7 @@
             };
         });
 
-        // --- Top Music Bar ---
+        // --- Top Music Bar (Refactored) ---
         const MusicBar = forwardRef((props, ref) => {
             const [playlist, setPlaylist] = useState([]);
             const [isPlaying, setIsPlaying] = useState(false);
@@ -597,145 +542,112 @@
         const MenuView = ({ 
             userName, setUserName, showNameWarning, mistakeLog, favorites, parsedData, 
             onStartLearn, onStartQuiz, onViewHistory, onViewMistakes, onViewTable, onPrintExam,
-            onLogin, isLocked, onQuickLogin, lastUser, onLogout, onDeleteUser,
-            globalUsers, firebaseStatus, firebaseStatusText // New props
-        }) => {
-            // Determine dot class based on status
-            const statusClass = {
-                'loading': 'status-loading',
-                'success': 'status-success',
-                'error': 'status-error'
-            }[firebaseStatus] || 'status-loading';
-
-            return (
-                <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in-up relative">
-                    {/* Cloud Status Indicator */}
-                    <div className="absolute top-2 right-4 md:top-0 md:right-0 flex items-center bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 border border-gray-200 shadow-sm cloud-status z-20">
-                        <span className={`status-dot ${statusClass}`}></span>
-                        {firebaseStatusText}
-                    </div>
-
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6 mt-8 md:mt-0">
-                        <div>
-                            <h1 className="text-4xl md:text-5xl font-extrabold text-amber-900 tracking-tight flex items-center gap-3 font-serif drop-shadow-sm">
-                                <span className="text-5xl md:text-6xl filter drop-shadow-md">🗣️</span> 
-                                <div>
-                                    字音大師 <span className="text-lg md:text-xl block md:inline text-amber-700 font-normal">易混淆字音版</span>
-                                </div>
-                            </h1>
-                            <div className="mt-6 flex flex-wrap items-center gap-3 p-4 bg-amber-100/80 backdrop-blur-sm rounded-xl border border-amber-200 shadow-sm">
-                                <span className="text-amber-900 font-bold text-lg">主公姓名：</span>
-                                <div className="relative flex flex-wrap items-center gap-2">
-                                    <input 
-                                        type="text" 
-                                        value={userName}
-                                        onChange={(e) => !isLocked && setUserName(e.target.value)}
-                                        placeholder="請輸入姓名"
-                                        disabled={isLocked}
-                                        list="global-users-list" // Add datalist
-                                        className={`border-2 rounded-lg px-4 py-2 outline-none transition-all text-lg w-48 ${isLocked ? 'bg-amber-50 text-gray-500 border-amber-200 cursor-not-allowed font-bold' : (showNameWarning ? 'border-red-500 bg-red-50 ring-2 ring-red-200 animate-shake' : 'border-amber-300 focus:ring-4 focus:ring-amber-200 focus:border-amber-500 bg-white')}`}
-                                    />
-                                    <datalist id="global-users-list">
-                                        {globalUsers.map(u => <option key={u} value={u} />)}
-                                    </datalist>
-
-                                    {!isLocked ? (
-                                        <button onClick={onLogin} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-base font-bold flex items-center transition-colors shadow-sm transform active:scale-95">
-                                            <Icon path={icons.login} className="w-5 h-5 mr-2" fill="currentColor"/> 登入
+            onLogin, isLocked, onQuickLogin, lastUser, onLogout, onDeleteUser
+        }) => (
+            <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in-up">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
+                    <div>
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-amber-900 tracking-tight flex items-center gap-3 font-serif drop-shadow-sm">
+                            <span className="text-5xl md:text-6xl filter drop-shadow-md">🗣️</span> 
+                            <div>
+                                字音大師 <span className="text-lg md:text-xl block md:inline text-amber-700 font-normal">易混淆字音版</span>
+                            </div>
+                        </h1>
+                        <div className="mt-6 flex flex-wrap items-center gap-3 p-4 bg-amber-100/80 backdrop-blur-sm rounded-xl border border-amber-200 shadow-sm">
+                            <span className="text-amber-900 font-bold text-lg">主公姓名：</span>
+                            <div className="relative flex flex-wrap items-center gap-2">
+                                <input 
+                                    type="text" 
+                                    value={userName}
+                                    onChange={(e) => !isLocked && setUserName(e.target.value)}
+                                    placeholder="請輸入姓名"
+                                    disabled={isLocked}
+                                    className={`border-2 rounded-lg px-4 py-2 outline-none transition-all text-lg w-48 ${isLocked ? 'bg-amber-50 text-gray-500 border-amber-200 cursor-not-allowed font-bold' : (showNameWarning ? 'border-red-500 bg-red-50 ring-2 ring-red-200 animate-shake' : 'border-amber-300 focus:ring-4 focus:ring-amber-200 focus:border-amber-500 bg-white')}`}
+                                />
+                                {!isLocked ? (
+                                    <button onClick={onLogin} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-base font-bold flex items-center transition-colors shadow-sm transform active:scale-95">
+                                        <Icon path={icons.login} className="w-5 h-5 mr-2" fill="currentColor"/> 登入
+                                    </button>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-bold flex items-center border border-green-200">
+                                            <Icon path={icons.check} className="w-5 h-5 mr-1.5"/> 已登入
+                                        </span>
+                                        <button onClick={onLogout} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm">
+                                            <Icon path={icons.logout} className="w-4 h-4 mr-1.5" fill="currentColor"/> 登出
                                         </button>
-                                    ) : (
-                                        <div className="flex flex-wrap gap-2">
-                                            <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-bold flex items-center border border-green-200">
-                                                <Icon path={icons.check} className="w-5 h-5 mr-1.5"/> 已登入
-                                            </span>
-                                            <button onClick={onLogout} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm">
-                                                <Icon path={icons.logout} className="w-4 h-4 mr-1.5" fill="currentColor"/> 登出
-                                            </button>
-                                            <button onClick={onDeleteUser} className="bg-gray-400 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm group" title="刪除使用者">
-                                                <Icon path={icons.userX} className="w-4 h-4 mr-1.5 group-hover:scale-110 transition-transform" fill="currentColor"/> 刪除
-                                            </button>
-                                        </div>
-                                    )}
-                                    {!isLocked && globalUsers.length > 0 && (
-                                        <div className="w-full mt-2">
-                                            <p className="text-xs text-amber-700 font-bold mb-1">曾經的挑戰者：</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {globalUsers.slice(0, 3).map(u => (
-                                                    <button key={u} onClick={() => onQuickLogin(u)} className="bg-white/50 hover:bg-white text-amber-800 border border-amber-200 px-2 py-1 rounded text-xs transition-colors">
-                                                        {u}
-                                                    </button>
-                                                ))}
-                                                {globalUsers.length > 3 && <span className="text-xs text-amber-600 self-center">...</span>}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {!isLocked && globalUsers.length === 0 && (
-                                        <div className="w-full mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100">
-                                            尚無挑戰者紀錄，歡迎加入！
-                                        </div>
-                                    )}
-                                    {showNameWarning && <div className="absolute left-0 -bottom-8 text-sm text-red-600 font-bold bg-red-100 px-2 py-1 rounded">* 請先輸入姓名並登入</div>}
-                                </div>
+                                        <button onClick={onDeleteUser} className="bg-gray-400 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm group" title="刪除使用者">
+                                            <Icon path={icons.userX} className="w-4 h-4 mr-1.5 group-hover:scale-110 transition-transform" fill="currentColor"/> 刪除
+                                        </button>
+                                    </div>
+                                )}
+                                {!isLocked && lastUser && (
+                                    <button onClick={onQuickLogin} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors border border-blue-200">
+                                        <Icon path={icons.lightning} className="w-4 h-4 mr-1.5" fill="currentColor"/> 快速登入 ({lastUser})
+                                    </button>
+                                )}
+                                {showNameWarning && <div className="absolute left-0 -bottom-8 text-sm text-red-600 font-bold bg-red-100 px-2 py-1 rounded">* 請先輸入姓名並登入</div>}
                             </div>
-                        </div>
-                        <div className="flex gap-3 w-full md:w-auto">
-                            <button onClick={onViewHistory} className="flex-1 md:flex-none justify-center flex items-center px-5 py-3 bg-white/90 backdrop-blur text-gray-700 rounded-xl shadow-sm hover:shadow-md hover:bg-white border-2 border-gray-200 font-bold text-lg transition-all"><Icon path={icons.history} className="w-5 h-5 mr-2"/> 戰績</button>
-                            <button onClick={onViewMistakes} className="flex-1 md:flex-none justify-center flex items-center px-5 py-3 bg-red-50/90 backdrop-blur text-red-700 rounded-xl shadow-sm hover:shadow-md hover:bg-red-100 border-2 border-red-200 font-bold text-lg transition-all"><Icon path={icons.alert} className="w-5 h-5 mr-2"/> 錯題 ({mistakeLog.length})</button>
                         </div>
                     </div>
-
-                    {/* 一覽表按鈕與列印按鈕 */}
-                    <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button onClick={onViewTable} className="w-full py-4 bg-purple-600/90 backdrop-blur hover:bg-purple-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-purple-400 group">
-                            <Icon path={icons.list} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform"/> 字音一覽表
-                        </button>
-                        <button onClick={onPrintExam} className="w-full py-4 bg-blue-600/90 backdrop-blur hover:bg-blue-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-blue-400 group">
-                            <Icon path={icons.printer} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform" fill="none" /> 🖨️ 列印考卷 (A4)
-                        </button>
+                    <div className="flex gap-3 w-full md:w-auto">
+                        <button onClick={onViewHistory} className="flex-1 md:flex-none justify-center flex items-center px-5 py-3 bg-white/90 backdrop-blur text-gray-700 rounded-xl shadow-sm hover:shadow-md hover:bg-white border-2 border-gray-200 font-bold text-lg transition-all"><Icon path={icons.history} className="w-5 h-5 mr-2"/> 戰績</button>
+                        <button onClick={onViewMistakes} className="flex-1 md:flex-none justify-center flex items-center px-5 py-3 bg-red-50/90 backdrop-blur text-red-700 rounded-xl shadow-sm hover:shadow-md hover:bg-red-100 border-2 border-red-200 font-bold text-lg transition-all"><Icon path={icons.alert} className="w-5 h-5 mr-2"/> 錯題 ({mistakeLog.length})</button>
                     </div>
+                </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* 錦囊收藏卡片 */}
-                        <div className="bg-gradient-to-br from-red-50/90 to-orange-50/90 backdrop-blur p-8 rounded-2xl shadow-sm border-2 border-red-100 flex flex-col justify-between hover:border-red-200 transition-colors">
-                            <div className="flex items-start mb-6">
-                                <div className="bg-white p-4 rounded-2xl shadow-sm text-red-500 mr-5 border border-red-100">
-                                    <Icon path={icons.heart} className="w-10 h-10" fill="currentColor"/>
-                                </div>
-                                <div>
-                                    <h3 className="text-2xl font-black text-gray-800 mb-1">重點收藏</h3>
-                                    <p className="text-gray-600 font-medium">目前收藏了 <span className="text-red-600 font-bold text-xl">{favorites.length}</span> 個語詞</p>
-                                </div>
+                {/* 一覽表按鈕與列印按鈕 */}
+                <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button onClick={onViewTable} className="w-full py-4 bg-purple-600/90 backdrop-blur hover:bg-purple-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-purple-400 group">
+                        <Icon path={icons.list} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform"/> 字音一覽表
+                    </button>
+                    <button onClick={onPrintExam} className="w-full py-4 bg-blue-600/90 backdrop-blur hover:bg-blue-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-blue-400 group">
+                        <Icon path={icons.printer} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform" fill="none" /> 🖨️ 列印考卷 (A4)
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* 錦囊收藏卡片 */}
+                    <div className="bg-gradient-to-br from-red-50/90 to-orange-50/90 backdrop-blur p-8 rounded-2xl shadow-sm border-2 border-red-100 flex flex-col justify-between hover:border-red-200 transition-colors">
+                        <div className="flex items-start mb-6">
+                            <div className="bg-white p-4 rounded-2xl shadow-sm text-red-500 mr-5 border border-red-100">
+                                <Icon path={icons.heart} className="w-10 h-10" fill="currentColor"/>
                             </div>
-                            <div className="grid grid-cols-2 gap-4 mt-auto">
-                                <button onClick={() => onStartLearn('收藏夾')} disabled={favorites.length===0} className="py-3 bg-white text-red-700 rounded-xl shadow-sm hover:bg-red-50 font-bold text-lg border-2 border-red-100 disabled:opacity-50 disabled:cursor-not-allowed">溫故</button>
-                                <button onClick={() => onStartQuiz('收藏夾')} disabled={favorites.length===0} className="py-3 bg-red-600 text-white rounded-xl shadow-lg hover:bg-red-700 font-bold text-lg transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">知新挑戰</button>
+                            <div>
+                                <h3 className="text-2xl font-black text-gray-800 mb-1">重點收藏</h3>
+                                <p className="text-gray-600 font-medium">目前收藏了 <span className="text-red-600 font-bold text-xl">{favorites.length}</span> 個語詞</p>
                             </div>
                         </div>
-                        
-                        {/* 精選字音卡片 */}
-                        <div className="bg-white/90 backdrop-blur p-8 rounded-2xl shadow-sm hover:shadow-xl transition-all border-2 border-amber-200 flex flex-col relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100 rounded-bl-full -mr-12 -mt-12 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-                            <div className="flex justify-between items-start mb-3 relative z-10">
-                                <h3 className="text-3xl font-black text-amber-900">精選字音</h3>
-                                <span className="text-sm font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full border border-amber-200">共 {Math.ceil(parsedData["精選字音"].length / ITEMS_PER_PAGE)} 關 ({parsedData["精選字音"].length} 題)</span>
-                            </div>
-                            <div className="text-gray-500 mb-8 font-medium text-lg relative z-10">
-                                包含仝賀、傭人、胸脯...等易混淆字音，增進語文能力。
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mt-auto relative z-10">
-                                <button onClick={() => onStartLearn('精選字音')} className="flex items-center justify-center py-3 bg-amber-50 text-amber-900 rounded-xl hover:bg-amber-100 font-bold text-lg border-2 border-amber-200 transition-colors"><Icon path={icons.book} className="w-5 h-5 mr-2"/> 研讀</button>
-                                <button onClick={() => onStartQuiz('精選字音')} className="flex items-center justify-center py-3 bg-amber-600 text-white rounded-xl shadow-lg hover:bg-amber-700 font-bold text-lg transform active:scale-95 transition-all"><Icon path={icons.play} className="w-5 h-5 mr-2"/> 開始挑戰</button>
-                            </div>
+                        <div className="grid grid-cols-2 gap-4 mt-auto">
+                            <button onClick={() => onStartLearn('收藏夾')} disabled={favorites.length===0} className="py-3 bg-white text-red-700 rounded-xl shadow-sm hover:bg-red-50 font-bold text-lg border-2 border-red-100 disabled:opacity-50 disabled:cursor-not-allowed">溫故</button>
+                            <button onClick={() => onStartQuiz('收藏夾')} disabled={favorites.length===0} className="py-3 bg-red-600 text-white rounded-xl shadow-lg hover:bg-red-700 font-bold text-lg transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">知新挑戰</button>
                         </div>
                     </div>
                     
-                    <div className="mt-12 text-center text-gray-500 text-sm font-medium bg-white/50 backdrop-blur rounded-full py-2 inline-block px-6 mx-auto w-full md:w-auto">
-                        &copy; 2025 字音大師 • 互動式學習系統
+                    {/* 精選字音卡片 */}
+                    <div className="bg-white/90 backdrop-blur p-8 rounded-2xl shadow-sm hover:shadow-xl transition-all border-2 border-amber-200 flex flex-col relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100 rounded-bl-full -mr-12 -mt-12 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+                        <div className="flex justify-between items-start mb-3 relative z-10">
+                            <h3 className="text-3xl font-black text-amber-900">精選字音</h3>
+                            <span className="text-sm font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full border border-amber-200">共 {Math.ceil(parsedData["精選字音"].length / ITEMS_PER_PAGE)} 關 ({parsedData["精選字音"].length} 題)</span>
+                        </div>
+                        <div className="text-gray-500 mb-8 font-medium text-lg relative z-10">
+                            包含仝賀、傭人、胸脯...等易混淆字音，增進語文能力。
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mt-auto relative z-10">
+                            <button onClick={() => onStartLearn('精選字音')} className="flex items-center justify-center py-3 bg-amber-50 text-amber-900 rounded-xl hover:bg-amber-100 font-bold text-lg border-2 border-amber-200 transition-colors"><Icon path={icons.book} className="w-5 h-5 mr-2"/> 研讀</button>
+                            <button onClick={() => onStartQuiz('精選字音')} className="flex items-center justify-center py-3 bg-amber-600 text-white rounded-xl shadow-lg hover:bg-amber-700 font-bold text-lg transform active:scale-95 transition-all"><Icon path={icons.play} className="w-5 h-5 mr-2"/> 開始挑戰</button>
+                        </div>
                     </div>
                 </div>
-            );
-        };
+                
+                <div className="mt-12 text-center text-gray-500 text-sm font-medium bg-white/50 backdrop-blur rounded-full py-2 inline-block px-6 mx-auto w-full md:w-auto">
+                    &copy; 2025 字音大師 • 互動式學習系統
+                </div>
+            </div>
+        );
 
+        // --- Print Exam View (Optimized for space) ---
         const PrintExamView = ({ items, onMenu }) => {
             useEffect(() => {
                 setTimeout(() => {
@@ -804,6 +716,7 @@
             );
         };
 
+        // TableView 組件
         const TableView = ({ items, onMenu, favorites, toggleFavorite }) => {
             const [searchTerm, setSearchTerm] = useState("");
             
@@ -1151,7 +1064,7 @@
             );
         };
 
-        const HistoryView = ({ historyLog, setHistoryLog, onMenu, onClearHistory }) => {
+        const HistoryView = ({ historyLog, setHistoryLog, onMenu }) => {
             const [selectedLog, setSelectedLog] = useState(null);
             
             if (selectedLog) {
@@ -1243,7 +1156,7 @@
                         </div>
                     )}
                      <div className="text-center mt-12 pb-10">
-                         <button onClick={onClearHistory} className="text-red-400 hover:text-red-600 text-sm flex items-center justify-center mx-auto hover:bg-red-50/80 px-4 py-2 rounded-lg transition-colors">
+                         <button onClick={() => {if(confirm('確定焚毀所有戰報？此操作無法復原！')) setHistoryLog([])}} className="text-red-400 hover:text-red-600 text-sm flex items-center justify-center mx-auto hover:bg-red-50/80 px-4 py-2 rounded-lg transition-colors">
                              <Icon path={icons.trash} className="w-4 h-4 mr-2"/> 清除所有紀錄
                         </button>
                     </div>
@@ -1251,7 +1164,7 @@
             );
         };
 
-        const MistakeView = ({ mistakes, mistakeLog, setMistakeLog, onMenu, onReviewAll, onClearMistakes }) => {
+        const MistakeView = ({ mistakes, mistakeLog, setMistakeLog, onMenu, onReviewAll }) => {
             return (
                 <div className="max-w-4xl mx-auto px-4 py-8">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
@@ -1300,7 +1213,7 @@
                     
                     {mistakes.length > 0 && (
                         <div className="text-center mt-12 pb-10">
-                            <button onClick={onClearMistakes} className="text-gray-400 hover:text-gray-600 text-sm hover:bg-gray-100/80 px-4 py-2 rounded-lg transition-colors">
+                            <button onClick={() => {if(confirm('確定清空錯題本？這將移除所有錯誤紀錄。')) { setMistakeLog([]); safeLocalStorage.setItem(`${STORAGE_PREFIX}_Mistakes`, '[]'); } }} className="text-gray-400 hover:text-gray-600 text-sm hover:bg-gray-100/80 px-4 py-2 rounded-lg transition-colors">
                                 清空錯題本
                             </button>
                         </div>
@@ -1312,236 +1225,129 @@
         const App = () => {
             const parsedData = useMemo(() => ({ "精選字音": WORD_DATA }), []);
             const allItems = WORD_DATA;
-            
-            // App State
+            const categories = ["精選字音"];
+
             const [currentMode, setCurrentMode] = useState('menu'); 
             const [activeCategory, setActiveCategory] = useState(null);
             const [showNameWarning, setShowNameWarning] = useState(false);
+            
             const [userName, setUserName] = useState('');
             const [isLocked, setIsLocked] = useState(false);
+            
+            // 使用新前綴的 Storage Keys
+            const KEY_LAST_USER = `${STORAGE_PREFIX}_LastUser`;
+            const KEY_FAVORITES = `${STORAGE_PREFIX}_Favorites`;
+            const KEY_HISTORY = `${STORAGE_PREFIX}_History`;
+            const KEY_MISTAKES = `${STORAGE_PREFIX}_Mistakes`;
+            const KEY_COMPLETED = `${STORAGE_PREFIX}_CompletedDays`;
+            
+            const [lastUser, setLastUser] = useState(() => safeLocalStorage.getItem(KEY_LAST_USER));
+
+            // 背景圖狀態
             const [bgImage, setBgImage] = useState('');
 
-            // Firebase State
-            const [user, setFirebaseUser] = useState(null);
-            const [db, setDb] = useState(null);
-            const [auth, setAuth] = useState(null);
-            const [firebaseStatus, setFirebaseStatus] = useState('loading'); // loading, success, error
-            const [firebaseStatusText, setFirebaseStatusText] = useState('讀取資料中...');
-            const [globalUsers, setGlobalUsers] = useState([]);
-
-            // Data State (Sync with Firebase)
-            const [favorites, setFavorites] = useState([]);
-            const [historyLog, setHistoryLog] = useState([]);
-            const [mistakeLog, setMistakeLog] = useState([]);
-            const [completedDays, setCompletedDays] = useState([]);
-
-            // Local only state
-            const [lastUser, setLastUser] = useState(() => safeLocalStorage.getItem(`${STORAGE_PREFIX}_LastUser`));
-            const [learnPage, setLearnPage] = useState(0);
-            const [quizQuestions, setQuizQuestions] = useState([]);
-            const [quizScore, setQuizScore] = useState(0);
-            const [combo, setCombo] = useState(0);
-            const [quizPage, setQuizPage] = useState(0);
-
-            const musicBarRef = useRef();
-
-            // 1. Init Firebase & Auth
-            useEffect(() => {
-                const initFirebase = async () => {
-                    if (!window.FirebaseApp) return;
-                    try {
-                        const { initializeApp, getAuth, getFirestore, signInAnonymously, onAuthStateChanged } = window.FirebaseApp;
-                        const app = initializeApp(firebaseConfig);
-                        const authInstance = getAuth(app);
-                        const dbInstance = getFirestore(app);
-                        setAuth(authInstance);
-                        setDb(dbInstance);
-
-                        await signInAnonymously(authInstance);
-                        
-                        onAuthStateChanged(authInstance, (u) => {
-                            if (u) setFirebaseUser(u);
-                        });
-                    } catch (error) {
-                        console.error("Firebase Init Error:", error);
-                        setFirebaseStatus('error');
-                        setFirebaseStatusText('雲端同步失敗');
-                    }
-                };
-                initFirebase();
-            }, []);
-
-            // 2. Fetch Global Users List (For Login Menu)
-            useEffect(() => {
-                if (!db) return;
-                const { doc, onSnapshot } = window.FirebaseApp;
-                const globalRef = doc(db, COLLECTION_NAME, 'global_users');
-                const unsub = onSnapshot(globalRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        setGlobalUsers(docSnap.data().users || []);
-                    }
-                });
-                return () => unsub();
-            }, [db]);
-
-            // 3. Sync User Data when Logged In (Locked)
-            useEffect(() => {
-                if (!db || !isLocked || !userName) {
-                    // Reset if logged out
-                    if (!isLocked) {
-                        setFavorites([]);
-                        setHistoryLog([]);
-                        setMistakeLog([]);
-                        setCompletedDays([]);
-                        setFirebaseStatus('loading');
-                        setFirebaseStatusText('等待登入...');
-                    }
-                    return;
-                }
-
-                setFirebaseStatus('loading');
-                setFirebaseStatusText('讀取資料中...');
-
-                const { doc, onSnapshot, setDoc, getDoc, arrayUnion } = window.FirebaseApp;
-                const userDocRef = doc(db, COLLECTION_NAME, `user_${userName}`);
-                const globalRef = doc(db, COLLECTION_NAME, 'global_users');
-
-                // Add user to global list if new
-                const registerUser = async () => {
-                   const snap = await getDoc(globalRef);
-                   if (!snap.exists()) {
-                       await setDoc(globalRef, { users: [userName] });
-                   } else {
-                       const data = snap.data();
-                       if (!data.users.includes(userName)) {
-                           await updateDoc(globalRef, { users: arrayUnion(userName) });
-                       }
-                   }
-                };
-                registerUser();
-
-                const unsub = onSnapshot(userDocRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        setFavorites(data.favorites || []);
-                        setHistoryLog(data.historyLog || []);
-                        setMistakeLog(data.mistakeLog || []);
-                        setCompletedDays(data.completedDays || []);
-                    }
-                    setFirebaseStatus('success');
-                    setFirebaseStatusText('已同步');
-                }, (error) => {
-                    console.error("Sync Error:", error);
-                    setFirebaseStatus('error');
-                    setFirebaseStatusText('雲端同步失敗');
-                });
-
-                return () => unsub();
-            }, [db, isLocked, userName]);
-
-            // Helper to save data to Firebase
-            const saveData = async (field, value) => {
-                if (!db || !userName) return;
-                const { doc, setDoc } = window.FirebaseApp;
-                try {
-                    setFirebaseStatus('loading');
-                    await setDoc(doc(db, COLLECTION_NAME, `user_${userName}`), {
-                        [field]: value
-                    }, { merge: true });
-                    // Status will update back to success via onSnapshot
-                } catch (e) {
-                    console.error("Save Error:", e);
-                    setFirebaseStatus('error');
-                    setFirebaseStatusText('儲存失敗');
-                }
-            };
-
-            // Init Background
+            // 初始化背景圖
             useEffect(() => {
                 const randomNum = Math.floor(Math.random() * 5) + 1;
                 setBgImage(`images/san${randomNum}.jpg`);
             }, []);
 
-            // Handlers
+            // 狀態初始化與 F5 保護 (Session Restore)
+            useEffect(() => {
+                const savedSessionUser = safeSessionStorage.getItem(`${STORAGE_PREFIX}_SessionUser`);
+                if (savedSessionUser) {
+                    setUserName(savedSessionUser);
+                    setIsLocked(true);
+                }
+            }, []);
+
+            const [favorites, setFavorites] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_FAVORITES)) || []);
+            const [historyLog, setHistoryLog] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_HISTORY)) || []);
+            const [mistakeLog, setMistakeLog] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_MISTAKES)) || []);
+            const [completedDays, setCompletedDays] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_COMPLETED)) || []);
+            const [learnPage, setLearnPage] = useState(0);
+
+            const [quizQuestions, setQuizQuestions] = useState([]);
+            const [quizScore, setQuizScore] = useState(0);
+            const [combo, setCombo] = useState(0);
+            const [quizPage, setQuizPage] = useState(0);
+
+            // Music Player Reference to trigger play from interactions
+            const musicBarRef = useRef();
+
+            // 存儲副作用
+            useEffect(() => { safeLocalStorage.setItem(KEY_FAVORITES, JSON.stringify(favorites)); }, [favorites]);
+            useEffect(() => { safeLocalStorage.setItem(KEY_HISTORY, JSON.stringify(historyLog)); }, [historyLog]);
+            useEffect(() => { 
+                if (mistakeLog.length > 0) safeLocalStorage.setItem(KEY_MISTAKES, JSON.stringify(mistakeLog)); 
+                else if (mistakeLog.length === 0 && safeLocalStorage.getItem(KEY_MISTAKES)) safeLocalStorage.removeItem(KEY_MISTAKES);
+            }, [mistakeLog]);
+            useEffect(() => { safeLocalStorage.setItem(KEY_COMPLETED, JSON.stringify(completedDays)); }, [completedDays]);
+            
+            // Login Handlers
             const handleLogin = () => {
                 if (userName.trim()) {
                     setIsLocked(true);
                     setShowNameWarning(false);
+                    safeLocalStorage.setItem(KEY_LAST_USER, userName);
+                    safeSessionStorage.setItem(`${STORAGE_PREFIX}_SessionUser`, userName); 
                     setLastUser(userName);
-                    safeLocalStorage.setItem(`${STORAGE_PREFIX}_LastUser`, userName);
+                    // Trigger music play on user interaction
                     if (musicBarRef.current) musicBarRef.current.triggerPlay();
                 } else {
                     setShowNameWarning(true);
                 }
             };
 
-            const handleQuickLogin = (name) => {
-                setUserName(name);
-                setIsLocked(true);
-                setShowNameWarning(false);
-                if (musicBarRef.current) musicBarRef.current.triggerPlay();
+            const handleQuickLogin = () => {
+                const storedUser = safeLocalStorage.getItem(KEY_LAST_USER);
+                if (storedUser) {
+                    setUserName(storedUser);
+                    setIsLocked(true);
+                    setShowNameWarning(false);
+                    safeSessionStorage.setItem(`${STORAGE_PREFIX}_SessionUser`, storedUser);
+                    // Trigger music play on user interaction
+                    if (musicBarRef.current) musicBarRef.current.triggerPlay();
+                }
             };
 
             const handleLogout = () => {
                 if(confirm('確定要登出嗎？')) {
                     setIsLocked(false);
                     setUserName('');
-                    setCurrentMode('menu');
+                    safeSessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`);
                 }
             };
 
-            const handleDeleteUser = async () => {
-                if (confirm('【危險操作】確定要刪除這位使用者的所有資料嗎？(雲端資料將被移除)')) {
-                    if (!db) return;
-                    const { doc, setDoc, updateDoc, arrayRemove } = window.FirebaseApp;
-                    try {
-                        // Clear user doc
-                        await setDoc(doc(db, COLLECTION_NAME, `user_${userName}`), {});
-                        // Remove from global list
-                        await updateDoc(doc(db, COLLECTION_NAME, 'global_users'), {
-                            users: arrayRemove(userName)
-                        });
+            const handleDeleteUser = () => {
+                if (confirm('【危險操作】確定要刪除這位使用者的所有資料嗎？')) {
+                    if (confirm('再次確認：這將會清除所有學習紀錄、收藏和錯題本，且無法復原！確定要執行嗎？')) {
+                        safeLocalStorage.removeItem(KEY_LAST_USER);
+                        safeLocalStorage.removeItem(KEY_FAVORITES);
+                        safeLocalStorage.removeItem(KEY_HISTORY);
+                        safeLocalStorage.removeItem(KEY_MISTAKES);
+                        safeLocalStorage.removeItem(KEY_COMPLETED);
+                        safeSessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`);
                         
-                        // Clear local state
                         setFavorites([]);
                         setHistoryLog([]);
                         setMistakeLog([]);
                         setCompletedDays([]);
                         setLastUser(null);
-                        safeLocalStorage.removeItem(`${STORAGE_PREFIX}_LastUser`);
                         setIsLocked(false);
                         setUserName('');
-                        alert('已刪除');
-                    } catch (e) {
-                        alert('刪除失敗: ' + e.message);
                     }
                 }
             };
 
             const toggleFavorite = (id) => { 
-                const newFavs = favorites.includes(id) ? favorites.filter(fid => fid !== id) : [...favorites, id];
-                // Optimistic update
-                setFavorites(newFavs);
-                saveData('favorites', newFavs);
-            };
-
-            const handleClearHistory = () => {
-                if(confirm('確定焚毀所有戰報？此操作無法復原！')) {
-                    setHistoryLog([]);
-                    saveData('historyLog', []);
-                }
-            };
-
-            const handleClearMistakes = () => {
-                if(confirm('確定清空錯題本？這將移除所有錯誤紀錄。')) {
-                    setMistakeLog([]);
-                    saveData('mistakeLog', []);
-                }
+                setFavorites(prev => prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]); 
             };
             
             // Sound Effects
             const playSoundEffect = (type) => {
                  try {
+                     // 使用新提供的音效
                     let audio;
                     if (type === 'correct') {
                          audio = new Audio('sounds/correct.mp3');
@@ -1553,8 +1359,8 @@
                     
                     if (playPromise !== undefined) {
                         playPromise.catch(e => {
-                            // console.log("Audio file play failed", e);
-                            // Fallback to oscillator
+                            console.log("Audio file play failed, fallback to oscillator", e);
+                            // Fallback to oscillator if file doesn't exist or play fails
                             const AudioContext = window.AudioContext || window.webkitAudioContext;
                             if (!AudioContext) return;
                             const ctx = new AudioContext();
@@ -1573,6 +1379,8 @@
 
             const handleStartQuiz = (category, pageIdx = 0, isMistakeMode = false) => {
                 if (!isLocked) { setShowNameWarning(true); return; }
+                
+                // Trigger music play on user interaction (start button)
                 if (musicBarRef.current) musicBarRef.current.triggerPlay();
 
                 let questions = [];
@@ -1622,6 +1430,7 @@
                 const q = newQuestions[qIndex];
                 if (q.userAnswer !== null) return; 
 
+                // 判斷邏輯更新：比對注音字串
                 const isCorrect = selectedOptionId === q.targetZhuyin;
                 q.userAnswer = selectedOptionId;
                 q.isCorrect = isCorrect;
@@ -1638,17 +1447,13 @@
                 } else {
                     setCombo(0);
                     playSoundEffect('wrong');
-                    
-                    // Update local state then sync
-                    const newMistakeLog = [...mistakeLog];
-                    const existingIdx = newMistakeLog.findIndex(m => m.id === q.id);
-                    if (existingIdx >= 0) {
-                        newMistakeLog[existingIdx] = { ...newMistakeLog[existingIdx], count: newMistakeLog[existingIdx].count + 1, lastMissed: new Date().toISOString() };
-                    } else {
-                        newMistakeLog.push({ id: q.id, count: 1, lastMissed: new Date().toISOString() });
-                    }
-                    setMistakeLog(newMistakeLog);
-                    saveData('mistakeLog', newMistakeLog);
+                    setMistakeLog(prev => {
+                        const existing = prev.find(m => m.id === q.id);
+                        const newLog = existing 
+                            ? prev.map(m => m.id === q.id ? { ...m, count: m.count + 1, lastMissed: new Date().toISOString() } : m) 
+                            : [...prev, { id: q.id, count: 1, lastMissed: new Date().toISOString() }];
+                        return newLog;
+                    });
                 }
                 setQuizQuestions(newQuestions);
             };
@@ -1665,23 +1470,17 @@
                         term: q.term, 
                         definition: q.definition, 
                         sentence: q.sentence, 
-                        fullZhuyin: q.fullZhuyin,
+                        fullZhuyin: q.fullZhuyin, // 增加完整注音到紀錄
                         isCorrect: q.isCorrect, 
                         userAnswer: q.userAnswer || "未作答", 
                         correctAnswer: q.targetZhuyin 
                     })) 
                 };
-                
-                const newHistory = [record, ...historyLog];
-                setHistoryLog(newHistory);
-                saveData('historyLog', newHistory);
-
+                setHistoryLog(prev => [record, ...prev]);
                 if (activeCategory !== '收藏夾' && activeCategory !== '錯題本') { 
                     const key = `${activeCategory}-${quizPage}`; 
                     if (!completedDays.includes(key) && quizScore > 0) { 
-                        const newCompleted = [...completedDays, key];
-                        setCompletedDays(newCompleted); 
-                        saveData('completedDays', newCompleted);
+                        setCompletedDays(prev => [...prev, key]); 
                     } 
                 }
             };
@@ -1699,6 +1498,7 @@
                     {/* Overlay for Readability */}
                     <div className="fixed inset-0 z-0 bg-white/70 backdrop-blur-[2px] no-print"></div>
                     
+                    {/* 音樂播放器 (現在位於頂端) */}
                     <MusicBar ref={musicBarRef} />
 
                     {/* Main Content Area */}
@@ -1715,7 +1515,6 @@
                                 onPrintExam={() => setCurrentMode('print')}
                                 onLogin={handleLogin} isLocked={isLocked} onQuickLogin={handleQuickLogin} lastUser={lastUser}
                                 onLogout={handleLogout} onDeleteUser={handleDeleteUser}
-                                globalUsers={globalUsers} firebaseStatus={firebaseStatus} firebaseStatusText={firebaseStatusText}
                             />
                         )}
                         {currentMode === 'learn' && (
@@ -1741,21 +1540,13 @@
                                 completedDays={completedDays}
                             />
                         )}
-                        {currentMode === 'history' && (
-                             <HistoryView 
-                                historyLog={historyLog} 
-                                setHistoryLog={setHistoryLog} 
-                                onMenu={() => setCurrentMode('menu')} 
-                                onClearHistory={handleClearHistory}
-                             />
-                        )}
+                        {currentMode === 'history' && <HistoryView historyLog={historyLog} setHistoryLog={setHistoryLog} onMenu={() => setCurrentMode('menu')} />}
                         {currentMode === 'mistakes' && (
                             <MistakeView 
                                 mistakes={allItems.filter(i => mistakeLog.some(m => m.id === i.id))}
                                 mistakeLog={mistakeLog} setMistakeLog={setMistakeLog}
                                 onMenu={() => setCurrentMode('menu')}
                                 onReviewAll={() => handleStartQuiz(null, 0, true)}
-                                onClearMistakes={handleClearMistakes}
                             />
                         )}
                         {currentMode === 'table' && (
