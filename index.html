@@ -52,18 +52,17 @@
         }
         .animate-shake { animation: shake 0.4s ease-in-out; }
 
-        /* 音樂播放器動畫 - 修改為 25秒 */
-        @keyframes scroll-text {
+        /* 跑馬燈動畫 */
+        @keyframes marquee {
             0% { transform: translateX(100%); }
             100% { transform: translateX(-100%); }
         }
-        .animate-scroll {
+        .animate-marquee {
             display: inline-block;
             white-space: nowrap;
-            animation: scroll-text 25s linear infinite; /* 修改速度為 25s */
-            padding-left: 100%;
+            animation: marquee 25s linear infinite;
         }
-        
+
         /* 圖片容器互動 */
         .group-img:hover img { transform: scale(1.08); }
         
@@ -71,28 +70,33 @@
         .no-select { user-select: none; -webkit-user-select: none; }
 
         /* 表格響應式優化 */
-        .table-container { overflow-x: auto; }
+        .table-container {
+            overflow-x: auto;
+        }
         .prose-table td, .prose-table th {
-            white-space: pre-wrap;
+            white-space: pre-wrap; /* 允許文字換行 */
             min-width: 120px;
         }
         
         /* 注音字體優化 */
-        .bopomofo { font-family: "BpmfGen", "HanWangMingMedium", system-ui, sans-serif; }
+        .bopomofo {
+            font-family: "BpmfGen", "HanWangMingMedium", system-ui, sans-serif;
+        }
 
-        /* 音量滑桿自定義樣式 */
+        /* 音量滑桿樣式 */
         input[type=range] {
-            -webkit-appearance: none;
-            background: transparent;
+            -webkit-appearance: none; 
+            background: transparent; 
         }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
             height: 12px;
             width: 12px;
             border-radius: 50%;
-            background: #b45309; /* amber-700 */
+            background: #d97706; /* amber-600 */
             cursor: pointer;
-            margin-top: -4px;
+            margin-top: -4px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
@@ -102,58 +106,85 @@
             border-radius: 2px;
         }
 
-        /* 列印專用樣式 */
+        /* 列印專用樣式 - 優化版 */
         @media print {
-            @page { size: A4 portrait; margin: 0.8cm; } /* 縮小邊距 */
-            body { background-color: white; overflow: visible; }
-            .no-print, .music-player-container { display: none !important; }
-            .print-only { display: block !important; }
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            
-            /* 列印時強制分頁處理 */
-            .break-inside-avoid { page-break-inside: avoid; }
+            @page {
+                size: A4 portrait;
+                margin: 0.8cm; /* 縮小邊界 */
+            }
+            body {
+                background-color: white;
+                overflow: visible;
+                font-size: 10pt; /* 整體字體縮小 */
+            }
+            /* 隱藏非列印元素 */
+            .no-print, .music-bar {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            /* 強制背景圖形列印 (針對 Chrome/Edge) */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            /* 列印時隱藏陰影與邊框顏色，改為純黑白以省墨 (可選) */
+            .print-border {
+                border-color: #000 !important;
+                border-width: 1px !important;
+            }
         }
         
-        .print-only { display: none; }
+        .print-only {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        // ==========================================
-        // CONFIGURATION: GitHub Music Settings
-        // ==========================================
+        // --- 1. 設定變數 (Configuration) ---
         const MUSIC_CONFIG = {
-            username: 'Wcc723',       // 您的 GitHub 帳號
-            repo: 'F2E-Mission-1',    // 您的儲存庫名稱
-            folder: 'images'          // 音樂所在的資料夾 (若為根目錄請留空)
+            username: 'frank20155',
+            repo: 'interactive_pronunciation',
+            folder: 'sounds/bgm' // 若在根目錄請留空，例如 'Music'
         };
 
-        const { useState, useEffect, useMemo, useRef } = React;
-        const ITEMS_PER_PAGE = 15; 
+        const { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef } = React;
+        const ITEMS_PER_PAGE = 15; // 15題一關
         
+        // Storage Key Prefix
         const STORAGE_PREFIX = "Pronunciation_Character_1";
-        
-        // --- 安全的 localStorage 封裝 ---
+        const MUSIC_STORAGE_KEY = `${STORAGE_PREFIX}_MusicState_V2`; // Update key version
+
+        // --- 安全的 localStorage 封裝 (防止隱私模式報錯) ---
         const safeLocalStorage = {
-            getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } },
-            setItem: (key, value) => { try { localStorage.setItem(key, value); } catch (e) { console.warn('Storage failed', e); } },
-            removeItem: (key) => { try { localStorage.removeItem(key); } catch (e) { } }
+            getItem: (key) => {
+                try { return localStorage.getItem(key); } catch (e) { return null; }
+            },
+            setItem: (key, value) => {
+                try { localStorage.setItem(key, value); } catch (e) { console.warn('Storage failed', e); }
+            },
+            removeItem: (key) => {
+                try { localStorage.removeItem(key); } catch (e) { }
+            }
         };
         const safeSessionStorage = {
-            getItem: (key) => { try { return sessionStorage.getItem(key); } catch (e) { return null; } },
-            setItem: (key, value) => { try { sessionStorage.setItem(key, value); } catch (e) { } },
-            removeItem: (key) => { try { sessionStorage.removeItem(key); } catch (e) { } }
+            getItem: (key) => {
+                try { return sessionStorage.getItem(key); } catch (e) { return null; }
+            },
+            setItem: (key, value) => {
+                try { sessionStorage.setItem(key, value); } catch (e) { }
+            },
+            removeItem: (key) => {
+                try { sessionStorage.removeItem(key); } catch (e) { }
+            }
         };
 
-        // --- 備用音樂清單 ---
-        const FALLBACK_PLAYLIST = [
-            { name: "備用音樂 1", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-            { name: "備用音樂 2", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" }
-        ];
-
         // --- 原始資料 (Raw Data) ---
+        // 格式: [id, term, targetChar, targetZhuyin, fullZhuyin, definition, sentence, scene]
         const RAW_DATA = [
             [1, "仝賀", "仝", "ㄊㄨㄥˊ", "ㄊㄨㄥˊ ㄏㄜˋ", "「同」的古字。共同祝賀。", "新春佳節，全體員工仝賀新禧。", "一群穿著喜慶傳統服飾的人們，雙手抱拳互相行禮祝賀，背景充滿節慶氣氛與紅色裝飾。"],
             [2, "傭人", "傭", "ㄩㄥ", "ㄩㄥ ㄖㄣˊ", "受僱用的人。★ 讀音易混淆。ㄩㄥ：受僱者；ㄩㄥˋ：佣金。", "這戶人家請了一位傭人來幫忙打理家務。", "一位穿著簡樸工作服的人正在大宅院裡勤奮地擦拭花瓶，神情專注。"],
@@ -164,37 +195,119 @@
             [7, "嘀咕", "嘀", "ㄉㄧˊ", "ㄉㄧˊ ˙ㄍㄨ", "低聲說話。形容心裡忐忑不安。", "他一個人在角落裡嘀咕，不知在說些什麼。", "兩個人湊得很近，其中一人用手遮著嘴巴小聲說話，另一人側耳傾聽，表情神秘。"],
             [8, "紮實", "紮", "ㄓㄚ", "ㄓㄚ ㄕˊ", "牢固、實在。", "他的基本功非常紮實，所以學得很快。", "一位工匠正在堆砌石牆，石塊堆疊得非常緊密穩固，展現出堅固耐用的感覺。"],
             [9, "絹綢", "絹", "ㄐㄩㄢˋ", "ㄐㄩㄢˋ ㄔㄡˊ", "絲織品的通稱。", "這塊絹綢質地細緻，價格不斐。", "一匹柔順光滑的絲綢布料在空中飄揚，質地細緻反光，旁邊有一位裁縫師正在撫摸布料。"],
-            [10, "瓊葩", "葩", "ㄆㄚ", "ㄑㄩㄥˊ ㄆㄚ", "美麗的花朵。", "花園裡瓊葩吐豔，美不勝收。", "一朵想像中極為美麗、晶瑩剔透的花朵盛開在仙境般的庭園中，散發光芒。"]
+            [10, "瓊葩", "葩", "ㄆㄚ", "ㄑㄩㄥˊ ㄆㄚ", "美麗的花朵。", "花園裡瓊葩吐豔，美不勝收。", "一朵想像中極為美麗、晶瑩剔透的花朵盛開在仙境般的庭園中，散發光芒。"],
+            [11, "規箴", "箴", "ㄓㄣ", "ㄍㄨㄟ ㄓㄣ", "規勸、勸告。", "朋友的規箴雖然逆耳，卻是為了你好。", "一位慈祥的長者拿著書卷，正語重心長地對一位年輕人給予建議，氣氛溫和莊重。"],
+            [12, "碑碣", "碣", "ㄐㄧㄝˊ", "ㄅㄟ ㄐㄧㄝˊ", "圓頂的石碑。（方者為碑，圓者為碣）。", "這塊古老的碑碣上記錄著當地的歷史。", "一塊古老且佈滿青苔的石碑矗立在荒煙漫草中，石碑造型古樸蒼勁，帶有歷史滄桑感。"],
+            [13, "蚊蚋", "蚋", "ㄖㄨㄟˋ", "ㄨㄣˊ ㄖㄨㄟˋ", "蚊類害蟲。", "夏日傍晚，草叢間蚊蚋成群，要小心叮咬。", "夏日傍晚的樹下，一大群細小的飛蟲聚集成團在空中飛舞，背景是夕陽。"],
+            [14, "創痕", "創", "ㄔㄨㄤ", "ㄔㄨㄤ ㄏㄣˊ", "★ ㄔㄨㄤ：傷口；ㄔㄨㄤˋ：開始。此指傷口。", "戰爭在人們心中留下了難以抹滅的創痕。", "一個舊木桌的表面上有幾道深刻的刮痕和修補過的痕跡，象徵歲月的歷練。"],
+            [15, "慧黠", "黠", "ㄒㄧㄚˊ", "ㄏㄨㄟˋ ㄒㄧㄚˊ", "聰慧靈敏。", "她那雙慧黠的眼睛，彷彿看透了一切。", "一個聰明伶俐的小孩，眼睛亮晶晶的，嘴角帶著機智的微笑，彷彿想到了好點子。"],
+            [16, "撮弄", "撮", "ㄘㄨㄛˋ", "ㄘㄨㄛˋ ㄋㄨㄥˋ", "戲弄、擺佈。讀 ㄘㄨㄛˋ 時含意較多，量詞時讀 ㄗㄨㄛˇ。", "他喜歡撮弄別人，常惹得大家哭笑不得。", "一個人在幕後用手操縱著木偶戲的絲線，帶有操縱與擺布的意象。"],
+            [17, "翎毛", "翎", "ㄌㄧㄥˊ", "ㄌㄧㄥˊ ㄇㄠˊ", "鳥類的羽毛。指國畫中畫鳥獸的技法。", "這位畫家的翎毛畫得栩栩如生。", "一根色彩斑斕、紋路細緻的孔雀羽毛特寫，光澤亮麗，背景簡單乾淨。"],
+            [18, "白蘋", "蘋", "ㄆㄧㄣˊ", "ㄅㄞˊ ㄆㄧㄣˊ", "植物名。", "白蘋風起，秋意漸濃。", "水邊生長著許多白色的水草植物，隨著水波盪漾，畫面清幽雅致。"],
+            [19, "櫺軒", "櫺", "ㄌㄧㄥˊ", "ㄌㄧㄥˊ ㄒㄩㄢ", "有窗格闌干的小室或長廊。", "庭院中的櫺軒，是古人讀書品茗的好地方。", "古典建築的窗格子，陽光透過精緻雕花的木窗灑入室內，光影交錯。"],
+            [20, "糝飯", "糝", "ㄙㄢˇ", "ㄙㄢˇ ㄈㄢˋ", "以米和羹。", "古人生活簡樸，常以藜羹糝飯度日。", "一雙手將細碎的野菜或肉末撒在一碗熱騰騰的米飯上，看起來樸實美味。"],
+            [21, "巉岩", "巉", "ㄔㄢˊ", "ㄔㄢˊ ㄧㄢˊ", "險峻的山岩。", "登山隊伍小心翼翼地攀過險惡的巉岩。", "一座高聳險峻的山峰，岩石形狀尖銳怪異，氣勢磅礡，雲霧繚繞。"],
+            [22, "觚稜", "觚", "ㄍㄨ", "ㄍㄨ ㄌㄥˊ", "宮殿屋脊的轉角處。", "夕陽映照著宮殿的觚稜，金光閃閃。", "古代宮殿建築屋頂轉角處的稜角，線條優美且結構複雜，背景是藍天。"],
+            [23, "蒼穹", "穹", "ㄑㄩㄥ", "ㄘㄤ ㄑㄩㄥ", "上蒼、天空。", "老鷹在蒼穹中展翅翱翔。", "廣闊無邊的蔚藍天空，幾朵白雲點綴，畫面開闊令人心曠神怡。"],
+            [24, "舞蹈", "舞", "ㄨˇ", "ㄨˇ ㄉㄠˋ", "手舞足蹈。表演藝術。", "她從小學習舞蹈，身段非常優美。", "一位舞者穿著飄逸的舞衣，在舞台上做出優美的旋轉跳躍動作，姿態輕盈。"],
+            [25, "蚱蜢", "蜢", "ㄇㄥˇ", "ㄓㄚˋ ㄇㄥˇ", "昆蟲名。", "草叢裡跳出一隻翠綠的蚱蜢。", "一隻綠色的蚱蜢停在草葉尖端，背景是模糊的草地，畫面充滿昆蟲生態趣。"],
+            [26, "星宿", "宿", "ㄒㄧㄡˋ", "ㄒㄧㄥ ㄒㄧㄡˋ", "★ ㄒㄧㄡˋ：星座；ㄙㄨˋ：住宿。", "古代天文學家將星空劃分為二十八星宿。", "夜空中佈滿了璀璨的星星，幾顆特別亮的星星連成了星座的形狀，神祕而寧靜。"],
+            [27, "粗獷", "獷", "ㄍㄨㄤˇ", "ㄘㄨ ㄍㄨㄤˇ", "豪壯、豪放。非「曠」。", "他的畫風粗獷豪邁，獨具一格。", "一位留著鬍鬚、肌肉結實的男子，穿著野外探險的服裝，神情豪邁不拘小節。"],
+            [28, "蹺家", "蹺", "ㄑㄧㄠ", "ㄑㄧㄠ ㄐㄧㄚ", "離家出走。", "青少年叛逆期容易有蹺家的念頭。", "一個揹著背包的青少年，在黃昏時刻獨自走在離家遠去的路上，背影顯得有些孤單與倔強。"],
+            [29, "蠕動", "蠕", "ㄖㄨˊ", "ㄖㄨˊ ㄉㄨㄥˋ", "緩慢移動。", "蚯蚓在泥土中緩緩蠕動。", "一隻毛毛蟲在樹葉上拱起身體緩慢爬行，展現柔軟且緩慢移動的樣子。"],
+            [30, "針灸", "灸", "ㄐㄧㄡˇ", "ㄓㄣ ㄐㄧㄡˇ", "中醫療法。", "針灸可以通經活絡，舒緩疼痛。", "一位中醫師專注地將細針輕輕刺入病人的穴道，背景是傳統中藥房。"],
+            [31, "哀悼", "悼", "ㄉㄠˋ", "ㄞ ㄉㄠˋ", "悲傷悼念。", "全國人民為地震中的罹難者哀悼。", "穿著黑色喪服的人們低頭默哀，手持白色花朵，氣氛莊嚴肅穆。"],
+            [32, "絢爛", "爛", "ㄒㄩㄢˋ", "ㄒㄩㄢˋ ㄌㄢˋ", "光彩奪目。", "煙火在夜空中綻放，絢爛無比。", "漆黑夜空中綻放著五顏六色盛大的煙火，照亮了地面觀賞的人群，色彩極度豐富飽和。"],
+            [33, "折騰", "騰", "˙ㄊㄥ", "ㄓㄜ ˙ㄊㄥ", "翻來覆去。引申為折磨。", "病痛把他折騰得瘦了一大圈。", "一個人在床上翻來覆去睡不著，棉被亂成一團，表情顯得疲憊又煩躁。"],
+            [34, "掌杓", "杓", "ㄕㄠˊ", "ㄓㄤˇ ㄕㄠˊ", "掌管廚房烹飪之事。", "今天的宴席由著名的大廚親自掌杓。", "一位大廚手握巨大的炒鍋杓子，在充滿火氣的廚房裡指揮若定地烹飪。"],
+            [35, "整飭", "飭", "ㄔˋ", "ㄓㄥˇ ㄔˋ", "整頓。", "新任局長上任後，大力整飭警紀。", "一位軍官正在整理隊伍，士兵們排列得整整齊齊，制服筆挺，展現紀律嚴明。"],
+            [36, "專橫", "橫", "ㄏㄥˋ", "ㄓㄨㄢ ㄏㄥˋ", "★ ㄏㄥˋ：蠻不講理；ㄏㄥˊ：水平。", "他作風專橫，聽不進部屬的意見。", "一個穿著華麗的人指手畫腳，態度傲慢地命令周圍低頭的人，展現霸道的樣子。"],
+            [37, "矇騙", "矇", "ㄇㄥ", "ㄇㄥ ㄆㄧㄢˋ", "欺騙。ㄇㄥ：欺騙；ㄇㄥˊ：無知/蒙蔽。", "他用謊言矇騙了所有人，但終究會被拆穿。", "一個魔術師打扮的人用布蓋住東西，臉上帶著狡猾的笑容，似乎在隱藏真相欺騙觀眾。"],
+            [38, "拗花", "拗", "ㄠˇ", "ㄠˇ ㄏㄨㄚ", "折斷花朵。", "請勿隨意拗花，愛護公園的一草一木。", "一雙手正在將柔軟的花枝彎曲成特定的造型，進行花藝創作，動作細膩。"],
+            [39, "指拭", "拭", "ㄕˋ", "ㄓˇ ㄕˋ", "用手指擦拭。", "他輕輕指拭去眼角的淚水。", "一個人用手指輕輕擦去眼角的淚水，動作溫柔且帶點感傷。"],
+            [40, "乾噎", "噎", "ㄧㄝ", "ㄍㄢ ㄧㄝ", "食物塞住喉嚨。引申為說不出話。", "饅頭太乾，吃得他直乾噎。", "一個人大口吃饅頭，表情痛苦地拍著胸口，像是食物卡在喉嚨吞不下去。"],
+            [41, "下頦", "頦", "ㄏㄞˊ", "ㄒㄧㄚˋ ㄏㄞˊ", "下巴。非「ㄎㄜ」。", "他摸著下頦，陷入了沉思。", "一張臉的特寫，強調下巴（下頦）的輪廓，手托著下巴正在思考的樣子。"],
+            [42, "羌人", "羌", "ㄑㄧㄤ", "ㄑㄧㄤ ㄖㄣˊ", "古代族名。", "羌人主要居住在中國西北地區。", "穿著古代羌族傳統服飾的人們，在吹奏羌笛，背景是高山草原。"],
+            [43, "旱澇", "澇", "ㄌㄠˋ", "ㄏㄢˋ ㄌㄠˋ", "乾旱與水災。", "氣候變遷導致旱澇災害頻發。", "畫面對比：左邊是龜裂乾旱的土地，右邊是淹水的農田，象徵極端的氣候災害。"],
+            [44, "凱撒", "撒", "ㄙㄚ", "ㄎㄞˇ ㄙㄚ", "羅馬政治家。音譯詞。", "凱撒大帝是古羅馬的傳奇人物。", "一位學生在舞台劇中扮演羅馬大帝凱撒，穿著紅色披風與戴著桂冠，神情威嚴。"],
+            [45, "兗州", "兗", "ㄧㄢˇ", "ㄧㄢˇ ㄓㄡ", "古九州之一。", "兗州位於現在的中國山東省。", "古代中國的地圖概念畫，標示出一塊區域（兗州），周圍有城牆與河流，風格古樸。"],
+            [46, "詰問", "詰", "ㄐㄧㄝˊ", "ㄐㄧㄝˊ ㄨㄣˋ", "責問、追問。", "律師在法庭上嚴厲詰問證人。", "法庭場景，一位律師嚴厲地指著證人席上的人發問，氣氛緊張逼人。"],
+            [47, "雅礱江", "礱", "ㄌㄨㄥˊ", "ㄧㄚˇ ㄌㄨㄥˊ ㄐㄧㄤ", "水名。", "雅礱江是長江的重要支流。", "一條奔騰的河流流經深邃的峽谷，水流湍急，兩岸山勢陡峭，展現大自然的壯麗。"],
+            [48, "龔先生", "龔", "ㄍㄨㄥ", "ㄍㄨㄥ ㄒㄧㄢ ㄕㄥ", "姓氏。", "龔先生是這方面的專家。", "一位穿著中山裝或長袍的斯文中年男子，戴著眼鏡，手裡拿著書，氣質儒雅。"],
+            [49, "括約肌", "括", "ㄎㄨㄛˋ", "ㄎㄨㄛˋ ㄩㄝ ㄐㄧ", "肌肉名。非「ㄍㄨㄚ」。", "運動可以增強括約肌的功能。", "生物教室的場景，黑板上畫著人體肌肉解剖圖，特寫一個環狀肌肉收縮的示意圖。"],
+            [50, "嗑瓜子", "嗑", "ㄎㄜˋ", "ㄎㄜˋ ㄍㄨㄚ ㄗˇ", "咬開。", "過年時，大家喜歡聚在一起嗑瓜子聊天。", "幾個人圍坐在桌邊閒聊，手中拿著瓜子放在嘴邊咬開，桌上有一堆瓜子殼，悠閒的樣子。"],
+            [51, "軋馬路", "軋", "ㄧㄚˋ", "ㄧㄚˋ ㄇㄚˇ ㄌㄨˋ", "ㄧㄚˋ：碾壓（形容逛街）；ㄍㄚˊ：軋戲；ㄓㄚ：軋鋼。", "年輕人喜歡騎機車在市區軋馬路。", "一對情侶或朋友們在寬闊的柏油馬路上並肩散步，背景是城市街景，悠閒自在。"],
+            [52, "偽君子", "偽", "ㄨㄟˋ", "ㄨㄟˋ ㄐㄩㄣ ㄗˇ", "假裝正直的人。ㄨㄟˋ：假的；ㄨㄟˊ：做。", "他表面仁義，其實是個偽君子。", "一個人表面上穿著整齊正派，手裡拿著禮物，但背後的鏡子裡映照出的倒影卻是陰險的表情。"],
+            [53, "黃鸝鳥", "鸝", "ㄌㄧˊ", "ㄏㄨㄤˊ ㄌㄧˊ ㄋㄧㄠˇ", "鳥名。", "黃鸝鳥在樹梢上唱著悅耳的歌。", "兩隻鮮黃色的黃鸝鳥停在翠綠的柳樹枝頭上，嘴巴張開像在唱歌，畫面明亮。"],
+            [54, "好姊妹", "姊", "ㄗˇ", "ㄏㄠˇ ㄗˇ ㄇㄟˋ", "感情很好的女性朋友。", "她們是無話不談的好姊妹。", "兩三個女生手勾手緊靠在一起，開心地笑著自拍或聊天，展現親密友誼。"],
+            [55, "三稜鏡", "稜", "ㄌㄥˊ", "ㄙㄢ ㄌㄥˊ ㄐㄧㄥˋ", "光學儀器。", "三稜鏡可以將白光分解成七種顏色。", "理化實驗室桌上放著一個三角玻璃柱，一道光束射入並折射出七彩彩虹光譜。"],
+            [56, "捺指紋", "捺", "ㄋㄚˋ", "ㄋㄚˋ ㄓˇ ㄨㄣˊ", "按壓。", "簽約時請在文件上簽名並捺指紋。", "一個人的手指沾了紅色印泥，用力按壓在白紙上，留下清晰的指紋印記。"],
+            [57, "十字鎬", "鎬", "ㄍㄠˇ", "ㄕˊ ㄗˋ ㄍㄠˇ", "挖掘工具。", "工人揮動十字鎬開挖路面。", "一把十字鎬斜靠在礦坑岩壁旁，或是工人舉起十字鎬準備挖掘的動作定格。"],
+            [58, "無厘頭", "厘", "ㄌㄧˊ", "ㄨˊ ㄌㄧˊ ㄊㄡˊ", "莫名其妙。", "這部電影充滿了無厘頭的搞笑情節。", "一個人頭上戴著奇怪的鍋子，做著滑稽搞笑的鬼臉和動作，周圍有漫畫式的驚嘆符號。"],
+            [59, "大不韙", "韙", "ㄨㄟˇ", "ㄉㄚˋ ㄅㄨˋ ㄨㄟˇ", "罪過。", "他冒天下之大不韙，堅持推行這項政策。", "一個人正要在寫著「禁止進入」的草地上踐踏，或做著明顯違反常理的壞事，周圍路人投以驚恐眼光。"],
+            [60, "性惇愚", "惇", "ㄉㄨㄣ", "ㄒㄧㄥˋ ㄉㄨㄣ ㄩˊ", "敦厚。", "他生性惇愚，不會算計別人。", "一個樸實的村民，臉上帶著憨厚的笑容，搔著頭，看起來誠實但不太靈光的樣子。"],
+            [61, "手握長鈇", "鈇", "ㄈㄨ", "ㄕㄡˇ ㄨㄛˋ ㄔㄤˊ ㄈㄨ", "鍘刀。斧頭。", "劊子手手握長鈇，準備行刑。", "一位古代武士，雙手緊握著一把長柄大斧頭，姿勢威武準備戰鬥。"],
+            [62, "撂在地上", "撂", "ㄌㄧㄠˋ", "ㄌㄧㄠˋ ㄗㄞˋ ㄉㄧˋ ㄕㄤˋ", "摔、丟。", "他生氣地把書包撂在地上。", "一個重物（如背包或工具）被隨意且重重地丟在地上，激起一點灰塵。"],
+            [63, "放聲大慟", "慟", "ㄊㄨㄥˋ", "ㄈㄤˋ ㄕㄥ ㄉㄚˋ ㄊㄨㄥˋ", "極度悲哀。", "聽到親人過世的消息，他忍不住放聲大慟。", "一個人跪在地上，仰天張大嘴巴痛哭流涕，表現出極度的悲傷。"],
+            [64, "孤僻之隱", "僻", "ㄆㄧˇ", "ㄍㄨ ㄆㄧˇ ㄓ ㄧㄣˇ", "習性、嗜好。", "這是他個人的孤癖之隱，不願對外人說。", "一個人獨自住在遠離人群的深山小屋裡，坐在窗邊喝茶，享受孤獨與隱居生活。"],
+            [65, "戕摩剝削", "戕", "ㄑㄧㄤˊ", "ㄑㄧㄤˊ ㄇㄛˊ ㄅㄛ ㄒㄩㄝ", "殘害。", "獨裁者戕摩剝削人民，終將被推翻。", "象徵性的畫面，一個貪婪的地主正在從瘦弱的農民手中奪走僅剩的糧食，展現壓榨剝削。"],
+            [66, "內心憮然", "憮", "ㄨˇ", "ㄋㄟˋ ㄒㄧㄣ ㄨˇ ㄖㄢˊ", "失意貌。ㄨˇ：失意；ㄈㄨˇ：安撫（通撫）。", "看著破敗的家園，他內心憮然。", "一個人站在落葉紛飛的樹下，表情悵然若失，眼神流露出失落與無奈。"],
+            [67, "攻占滬尾", "占", "ㄓㄢˋ", "ㄍㄨㄥ ㄓㄢˋ ㄏㄨˋ ㄨㄟˇ", "攻取並佔領。滬尾為淡水舊稱。", "清法戰爭中，法軍試圖攻占滬尾，但遭遇頑強抵抗。", "清法戰爭的歷史場景，清軍士兵在淡水（滬尾）岸邊英勇抵禦，砲火與煙霧瀰漫。"],
+            [68, "付之闕如", "闕", "ㄑㄩㄝ", "ㄈㄨˋ ㄓ ㄑㄩㄝ ㄖㄨˊ", "欠缺、沒有。", "關於這段歷史的記載，史料付之闕如。", "打開一個精美的盒子，裡面卻是空空如也，什麼都沒有，象徵缺乏。"],
+            [69, "徇其私欲", "徇", "ㄒㄩㄣˋ", "ㄒㄩㄣˋ ㄑㄧˊ ㄙ ㄩˋ", "順從。", "官員不應徇其私欲，而罔顧公眾利益。", "一個人抱著一大堆金銀財寶，臉上露出貪婪滿足的笑容，完全不顧旁邊需要幫助的人。"],
+            [70, "攫為己有", "攫", "ㄐㄩㄝˊ", "ㄐㄩㄝˊ ㄨㄟˊ ㄐㄧˇ ㄧㄡˇ", "抓取。", "他企圖將公司的資產攫為己有。", "一隻大手伸出來，一把抓走桌上所有的糖果或錢幣，展現強行佔有的動作。"],
+            [71, "以惑愚瞽", "瞽", "ㄍㄨˇ", "ㄧˇ ㄏㄨㄛˋ ㄩˊ ㄍㄨˇ", "瞎眼。", "這些迷信說法只是用來以惑愚瞽罷了。", "一個騙子在台上誇誇其談，台下是一群被矇住眼睛的人在鼓掌，象徵欺騙無知的人。"],
+            [72, "鈿頭雲篦", "篦", "ㄅㄧˋ", "ㄉㄧㄢˋ ㄊㄡˊ ㄩㄣˊ ㄅㄧˋ", "梳髮的用具。", "（白居易《琵琶行》句）鈿頭雲篦擊節碎。", "古代精緻的髮飾特寫，鑲嵌著金銀珠寶，雕刻成雲朵形狀的梳子，華麗典雅。"],
+            [73, "便宜從事", "便", "ㄅㄧㄢˋ", "ㄅㄧㄢˋ ㄧˊ ㄘㄨㄥˊ ㄕˋ", "斟酌情形，自行處理。ㄅㄧㄢˋ：方便；ㄆㄧㄢˊ：價格低。", "長官授權他在外地可以便宜從事。", "戰場上一位將軍看著地圖，果斷地指揮士兵改變路線，展現臨機應變的決策。"],
+            [74, "提挈同來", "挈", "ㄑㄧㄝˋ", "ㄊㄧˊ ㄑㄧㄝˋ ㄊㄨㄥˊ ㄌㄞˊ", "提、帶領。", "他提挈同來的好友一起創業。", "兩個人手拉著手，或者一個人提著行李帶著另一個人，一起高興地走進大門。"],
+            [75, "動人心弦", "弦", "ㄒㄧㄢˊ", "ㄉㄨㄥˋ ㄖㄣˊ ㄒㄧㄣ ㄒㄧㄢˊ", "樂器上的線。比喻心靈。非「ㄒㄩㄢˊ」。", "這首樂曲旋律優美，動人心弦。", "一位音樂家在舞台上拉小提琴，台下的觀眾聽得如癡如醉，有人感動落淚。"],
+            [76, "衝勁十足", "勁", "ㄐㄧㄥˋ", "ㄔㄨㄥ ㄐㄧㄥˋ ㄕˊ ㄗㄨˊ", "力氣、精神。ㄐㄧㄥˋ：力氣；ㄐㄧㄣˋ：強勁。此處讀四聲。", "這個年輕人衝勁十足，工作效率很高。", "一群跑者在起跑線上全力衝刺，領頭的那位表情充滿鬥志與能量，速度線條感強烈。"],
+            [77, "互訴衷曲", "曲", "ㄑㄩ", "ㄏㄨˋ ㄙㄨˋ ㄓㄨㄥ ㄑㄩ", "隱秘的心事。ㄑㄩ：心事/彎曲；ㄑㄩˇ：歌曲。", "多年好友重逢，互訴衷曲，聊了一整晚。", "兩個知心好友坐在星空下或溫馨的房間裡，面對面真誠地談心，氣氛溫暖。"],
+            [78, "誦詩舞勺", "勺", "ㄓㄨㄛˊ", "ㄙㄨㄥˋ ㄕ ㄨˇ ㄓㄨㄛˊ", "古代的一種樂舞。", "古時學童十三歲學誦詩舞勺。", "古代學堂場景，小學生們搖頭晃腦地背誦詩歌，同時手拿著勺子做著簡單的舞蹈動作（古代小學教育）。"],
+            [79, "孰能無惑", "孰", "ㄕㄨˊ", "ㄕㄨˊ ㄋㄥˊ ㄨˊ ㄏㄨㄛˋ", "誰。", "人非聖賢，孰能無惑？", "一位學生滿頭問號，舉手向老師發問，老師微笑準備解答，象徵誰都會有困惑。"],
+            [80, "一只皮箱", "只", "ㄓ", "ㄧ ㄓ ㄆㄧˊ ㄒㄧㄤ", "量詞。考試用字若為「隻」亦讀 ㄓ。", "他提著一只皮箱，獨自到台北打拚。", "一個復古的舊皮箱孤零零地放在火車站的月台上，帶有旅行與離別的意象。"],
+            [81, "排比修辭", "比", "ㄅㄧˇ", "ㄆㄞˊ ㄅㄧˇ ㄒㄧㄡ ㄘˊ", "並列。", "這篇文章運用了大量的排比修辭，增強了氣勢。", "畫面上畫著三棵一模一樣的樹、三朵一模一樣的花，整齊排列，象徵句式的重複與整齊。"],
+            [82, "挑撥離間", "間", "ㄐㄧㄢˋ", "ㄊㄧㄠˇ ㄅㄛ ㄌㄧˊ ㄐㄧㄢˋ", "分化、隔閡。", "不要聽信小人的挑撥離間，破壞了我們的感情。", "一個人在兩群朋友中間，分別對左右兩邊說悄悄話，導致兩邊的人互相怒視。"],
+            [83, "故態復萌", "萌", "ㄇㄥˊ", "ㄍㄨˋ ㄊㄞˋ ㄈㄨˋ ㄇㄥˊ", "發生。", "才剛戒菸不久，他又故態復萌了。", "一個剛戒菸的人，又忍不住偷偷拿起了煙，或者剛改掉壞習慣又重犯，表情懊惱。"],
+            [84, "陰陽潛移", "潛", "ㄑㄧㄢˊ", "ㄧㄣ ㄧㄤˊ ㄑㄧㄢˊ ㄧˊ", "暗中。", "歲月陰陽潛移，不知不覺我們都老了。", "畫面上同時呈現白天與黑夜的漸層過渡，太陽與月亮同框，象徵時間與陰陽的悄悄變化。"],
+            [85, "夫子哂之", "哂", "ㄕㄣˇ", "ㄈㄨ ㄗˇ ㄕㄣˇ ㄓ", "微笑。", "子路彈瑟，夫子晒之。", "古代場景，一位穿著儒服的老師（孔子形象）對著正在彈瑟的學生露出意味深長的微笑。"],
+            [86, "陳摶老祖", "摶", "ㄊㄨㄢˊ", "ㄔㄣˊ ㄊㄨㄢˊ ㄌㄠˇ ㄗㄨˇ", "人名。非「博」。", "陳摶老祖是著名的道家人物。", "一位白鬍子的道教老神仙，側身躺在雲端或大石頭上呼呼大睡，悠閒自在。"],
+            [87, "戛然而止", "戛", "ㄐㄧㄚˊ", "ㄐㄧㄚˊ ㄖㄢˊ ㄦˊ ㄓˇ", "突然停止。", "掌聲戛然而止，全場屏息以待。", "指揮家手中的指揮棒突然停在半空中，樂團全體靜止，畫面充滿了突然停止的張力。"],
+            [88, "舊時欄楯", "楯", "ㄕㄨㄣˇ", "ㄐㄧㄡˋ ㄕˊ ㄌㄢˊ ㄕㄨㄣˇ", "欄杆。", "庭院中還保留著舊時欄楯，古色古香。", "一棟老舊房子前的木頭欄杆，雖然油漆斑駁但充滿回憶，背景有懷舊的庭院。"],
+            [89, "甕牖而居", "牖", "ㄧㄡˇ", "ㄨㄥˋ ㄧㄡˇ ㄦˊ ㄐㄩ", "窗戶。", "陋室雖小，但扁牖而居，倒也清靜。", "簡陋的小屋，只有一扇小小的窗戶，透過窗戶可以看到裡面簡樸的生活環境。"],
+            [90, "參省乎己", "省", "ㄒㄧㄥˇ", "ㄘㄢ ㄒㄧㄥˇ ㄏㄨ ㄐㄧˇ", "反省。", "君子博學而日參省乎己，則知明而行無過矣。", "一個人對著鏡子，鏡子裡映照出他在反省思考自己的內心，表情嚴肅認真。"],
+            [91, "斜暉脈脈", "脈", "ㄇㄛˋ", "ㄒㄧㄝˊ ㄏㄨㄟ ㄇㄛˋ ㄇㄛˋ", "含情凝視的樣子。", "夕陽西下，斜暉脈脈水悠悠。", "夕陽西下，金色的陽光斜斜地灑在平靜的江面上，光影柔和且帶點含情脈脈的感覺。"],
+            [92, "祖先墳塋", "塋", "ㄧㄥˊ", "ㄗㄨˇ ㄒㄧㄢ ㄈㄣˊ ㄧㄥˊ", "墓地。", "清明節我們都會回鄉掃墓，祭拜祖先墳塋。", "清明掃墓場景，一個整理乾淨的墓地，後代子孫正在祭拜，背景是青翠的山林，氣氛莊重。"],
+            [93, "萬頭攢動", "攢", "ㄘㄨㄢˊ", "ㄨㄢˋ ㄊㄡˊ ㄘㄨㄢˊ ㄉㄨㄥˋ", "穿行、鑽營。", "跨年晚會現場萬頭鑽動，擠得水洩不通。", "廣場上密密麻麻擠滿了人頭，人山人海的熱鬧場面，俯視角度。"],
+            [94, "荒耽於酒", "耽", "ㄉㄢ", "ㄏㄨㄤ ㄉㄢ ㄩˊ ㄐㄧㄡˇ", "沉溺。", "他整日荒耽於酒，不務正業。", "一個古人醉倒在酒甕旁，周圍散落著酒杯，衣服凌亂，顯得頹廢不振。"],
+            [95, "嘉言懿行", "懿", "ㄧˋ", "ㄐㄧㄚ ㄧㄢˊ ㄧˋ ㄒㄧㄥˋ", "美好。", "古聖先賢的嘉言懿行，值得我們學習。", "一本打開的古書發出金光，書頁上雖然無字但象徵著美好的德行與言語，周圍環繞著祥雲。"],
+            [96, "獐頭鼠目", "獐", "ㄓㄤ", "ㄓㄤ ㄊㄡˊ ㄕㄨˇ ㄇㄨˋ", "動物名。", "這個人獐頭鼠目，看起來不像好人。", "一個畫得很誇張的壞人，頭像獐子、眼睛像老鼠般賊頭賊腦，外貌猥瑣。"],
+            [97, "滅國弒君", "弒", "ㄕˋ", "ㄇㄧㄝˋ ㄍㄨㄛˊ ㄕˋ ㄐㄩㄣ", "殺（下殺上）。", "臣子弒君是封建時代的大罪。", "戰亂的皇宮場景，王座傾倒，火光四起，象徵一個國家的覆滅與君王的逝去，戲劇張力強。"],
+            [98, "閱聽大眾", "閱", "ㄩㄝˋ", "ㄩㄝˋ ㄊㄧㄥ ㄉㄚˋ ㄓㄨㄥˋ", "觀看。", "媒體應對閱聽大眾負責，報導真實新聞。", "一群不同年齡、性別的人們（大眾）正專注地看著前方（像是在看電視或聽廣播），表情各異。"]
         ];
-        
-        // 模擬補齊資料以便展示列表與列印效果
-        while(RAW_DATA.length < 50) {
-             RAW_DATA.push([RAW_DATA.length + 1, "測試詞", "試", "ㄕˋ", "ㄘㄜˋ ㄕˋ", "測試用資料。", "這是一個自動生成的測試句子。", "一個測試用的畫面。"]);
-        }
 
-        // --- Icons ---
+        // --- Icons (Fixed for JSX Fragments) ---
         const icons = {
             check: <polyline points="20 6 9 17 4 12" />,
             play: <polygon points="5 3 19 12 5 21 5 3" />,
             pause: <><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>,
             skipForward: <><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></>,
-            skipBack: <><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></>,
-            volume: <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />,
-            music: <><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></>,
-            book: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
-            menu: <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
             left: <polyline points="15 18 9 12 15 6"/>,
             heart: <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>,
             history: <><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></>,
             alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
-            trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
+            trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
             login: <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>,
             lightning: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
             logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>,
             userX: <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></>,
             search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
             list: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
-            printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>
+            printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
+            book: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
+            menu: <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
+            volume: <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />,
+            volumeX: <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>
         };
 
         const Icon = ({ path, className, fill = "none" }) => (
@@ -217,164 +330,221 @@
                 </span>
             );
         };
-        
-        // 為了 TableView 重複使用的 Highlight (邏輯相同)
-        const HighlightTerm = HighlightedTerm;
 
         // --- Distractor Generator ---
         const generateDistractors = (correctZhuyin) => {
             const distractors = [];
-            while(distractors.length < 3) {
-                 distractors.push("ㄘㄨㄛˋ"); 
+            const tones = [' ', 'ˊ', 'ˇ', 'ˋ', '˙'];
+            const initials = ['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ'];
+            
+            let tries = 0;
+            while(distractors.length < 3 && tries < 50) {
+                tries++;
+                let newZ = correctZhuyin;
+                const randomType = Math.random();
+                
+                if (randomType < 0.5) {
+                    const currentTone = tones.find(t => correctZhuyin.endsWith(t)) || ' ';
+                    const otherTones = tones.filter(t => t !== currentTone);
+                    const newTone = otherTones[Math.floor(Math.random() * otherTones.length)];
+                    if (currentTone === ' ') {
+                        newZ = correctZhuyin + newTone;
+                    } else {
+                        newZ = correctZhuyin.slice(0, -1) + (newTone === ' ' ? '' : newTone);
+                    }
+                } 
+                else {
+                    const firstChar = correctZhuyin[0];
+                    if (initials.includes(firstChar)) {
+                        const otherInitials = initials.filter(i => i !== firstChar);
+                        const newInitial = otherInitials[Math.floor(Math.random() * otherInitials.length)];
+                        newZ = newInitial + correctZhuyin.slice(1);
+                    } else {
+                         const otherInitials = initials;
+                         const newInitial = otherInitials[Math.floor(Math.random() * otherInitials.length)];
+                         newZ = newInitial + correctZhuyin;
+                    }
+                }
+
+                if (newZ !== correctZhuyin && !distractors.includes(newZ)) {
+                    distractors.push(newZ);
+                }
             }
-            return ["ㄅㄨˊ", "ㄉㄨㄟˋ", "ㄧㄡˋ"]; 
+            while(distractors.length < 3) {
+                distractors.push("ㄘㄨㄛˋ"); // Generic placeholder
+            }
+            return distractors;
         };
 
         // --- Data Processor ---
         const WORD_DATA = RAW_DATA.map(item => {
             const [id, term, targetChar, targetZhuyin, fullZhuyin, definition, sentence, scene] = item;
             return {
-                id, term, targetChar, targetZhuyin, fullZhuyin, 
+                id, term, targetChar, targetZhuyin, fullZhuyin, definition, sentence, scene,
                 distractors: generateDistractors(targetZhuyin),
-                definition, sentence, scene,
                 image: `p${String(id).padStart(3, '0')}.jpg`
             };
         });
 
-        // --- Music Player Component ---
-        const MusicPlayer = ({ autoPlayTriggered }) => {
+        // --- Top Music Bar (Refactored) ---
+        const MusicBar = forwardRef((props, ref) => {
             const [playlist, setPlaylist] = useState([]);
-            const [trackIndex, setTrackIndex] = useState(0);
             const [isPlaying, setIsPlaying] = useState(false);
+            const [currentIndex, setCurrentIndex] = useState(0);
             const [volume, setVolume] = useState(0.3);
-            const [loading, setLoading] = useState(true);
             const audioRef = useRef(new Audio());
 
+            // 1. Fetch Playlist from GitHub
             useEffect(() => {
                 const fetchMusic = async () => {
-                    if (!MUSIC_CONFIG.username || !MUSIC_CONFIG.repo) {
-                        setPlaylist(shuffleArray(FALLBACK_PLAYLIST));
-                        setLoading(false);
-                        return;
-                    }
-
                     try {
-                        let url = `https://api.github.com/repos/${MUSIC_CONFIG.username}/${MUSIC_CONFIG.repo}/contents`;
-                        if (MUSIC_CONFIG.folder) url += `/${MUSIC_CONFIG.folder}`;
-                        
-                        const response = await fetch(url);
-                        if (!response.ok) throw new Error("GitHub API Error");
+                        const { username, repo, folder } = MUSIC_CONFIG;
+                        const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents/${folder}`;
+                        const response = await fetch(apiUrl);
+                        if (!response.ok) throw new Error('Network response was not ok');
                         const data = await response.json();
                         
-                        let musicFiles = data
-                            .filter(file => file.name.endsWith('.mp3') || file.name.endsWith('.MP3'))
+                        const tracks = data
+                            .filter(file => file.name.endsWith('.mp3'))
                             .map(file => ({
-                                name: file.name.replace(/\.mp3$/i, ''),
-                                url: file.download_url
+                                title: file.name.replace('.mp3', ''),
+                                src: file.download_url
                             }));
 
-                        if (musicFiles.length === 0) musicFiles = FALLBACK_PLAYLIST;
-                        setPlaylist(shuffleArray(musicFiles));
+                        // Shuffle Playlist
+                        for (let i = tracks.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+                        }
+
+                        if (tracks.length > 0) {
+                            setPlaylist(tracks);
+                            audioRef.current.src = tracks[0].src;
+                        }
                     } catch (error) {
-                        setPlaylist(shuffleArray(FALLBACK_PLAYLIST));
-                    } finally {
-                        setLoading(false);
+                        console.error("Failed to load music:", error);
                     }
                 };
                 fetchMusic();
             }, []);
 
-            const shuffleArray = (array) => {
-                let newArr = [...array];
-                for (let i = newArr.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-                }
-                return newArr;
-            };
-
+            // 2. Audio Control Logic
             useEffect(() => {
                 const audio = audioRef.current;
-                const handleEnded = () => nextTrack();
+                audio.volume = volume;
+
+                const handleEnded = () => {
+                    handleNext(true); // Auto play next
+                };
+
                 audio.addEventListener('ended', handleEnded);
                 return () => audio.removeEventListener('ended', handleEnded);
-            }, [trackIndex, playlist]);
+            }, [volume, playlist, currentIndex]);
 
-            useEffect(() => {
+            // Expose play function to parent via ref
+            useImperativeHandle(ref, () => ({
+                triggerPlay: () => {
+                    if (playlist.length > 0 && !isPlaying) {
+                        audioRef.current.play()
+                            .then(() => setIsPlaying(true))
+                            .catch(e => console.log("Auto-play blocked, waiting for interaction", e));
+                    }
+                }
+            }));
+
+            const handlePlayPause = () => {
                 if (playlist.length === 0) return;
-                const audio = audioRef.current;
-                const currentTrack = playlist[trackIndex];
-                if (audio.src !== currentTrack.url) {
-                    audio.src = currentTrack.url;
-                    audio.load();
-                }
+                
                 if (isPlaying) {
-                   const playPromise = audio.play();
-                   if (playPromise !== undefined) playPromise.catch(() => setIsPlaying(false));
-                }
-            }, [trackIndex, playlist]);
-
-            useEffect(() => {
-                const audio = audioRef.current;
-                if (isPlaying) {
-                     const playPromise = audio.play();
-                     if(playPromise !== undefined) playPromise.catch(() => setIsPlaying(false));
+                    audioRef.current.pause();
                 } else {
-                    audio.pause();
+                    audioRef.current.play();
                 }
-            }, [isPlaying]);
+                setIsPlaying(!isPlaying);
+            };
 
-            useEffect(() => { audioRef.current.volume = volume; }, [volume]);
+            const handleNext = (autoPlay = false) => {
+                if (playlist.length === 0) return;
+                const nextIndex = (currentIndex + 1) % playlist.length;
+                setCurrentIndex(nextIndex);
+                audioRef.current.src = playlist[nextIndex].src;
+                if (isPlaying || autoPlay) {
+                    audioRef.current.play();
+                    setIsPlaying(true);
+                }
+            };
 
-            useEffect(() => {
-                if (autoPlayTriggered && !isPlaying && playlist.length > 0) setIsPlaying(true);
-            }, [autoPlayTriggered, playlist]);
+            const handlePrev = () => {
+                if (playlist.length === 0) return;
+                const prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+                setCurrentIndex(prevIndex);
+                audioRef.current.src = playlist[prevIndex].src;
+                if (isPlaying) {
+                    audioRef.current.play();
+                }
+            };
 
-            const nextTrack = () => setTrackIndex(prev => (prev + 1) % playlist.length);
-            const prevTrack = () => setTrackIndex(prev => (prev - 1 + playlist.length) % playlist.length);
+            const handleVolumeChange = (e) => {
+                const newVol = parseFloat(e.target.value);
+                setVolume(newVol);
+                audioRef.current.volume = newVol;
+            };
 
-            const currentTrackName = playlist[trackIndex]?.name || "Loading...";
-            if (loading && playlist.length === 0) return null;
+            const currentTrack = playlist[currentIndex];
 
             return (
-                <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 music-player-container">
-                    <div className="bg-amber-800/90 backdrop-blur-md text-amber-50 rounded-full shadow-xl border border-amber-600/50 px-4 py-2 flex items-center gap-4 min-w-[320px] max-w-[95vw]">
-                        {/* Title Marquee (加寬) */}
-                        <div className="w-48 md:w-64 overflow-hidden relative h-6 flex items-center bg-black/20 rounded-md px-2">
-                            <div className="text-xs font-bold whitespace-nowrap overflow-hidden text-amber-200 w-full text-center">
-                                {currentTrackName.length > 10 ? 
-                                    <span className="animate-scroll">{currentTrackName} &nbsp;&nbsp;&nbsp;&nbsp; {currentTrackName}</span> : 
-                                    currentTrackName
-                                }
+                <div className="sticky top-0 z-50 w-full bg-amber-500 text-white shadow-md border-b border-amber-600 px-4 py-2 flex items-center justify-between music-bar h-14">
+                    {/* Left: Controls */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <button onClick={handlePrev} className="p-1.5 hover:bg-amber-600 rounded-full transition-colors">
+                            <Icon path={icons.left} className="w-5 h-5" />
+                        </button>
+                        <button onClick={handlePlayPause} className="p-2 bg-white text-amber-600 rounded-full hover:bg-amber-100 transition-colors shadow-sm">
+                            <Icon path={isPlaying ? icons.pause : icons.play} className="w-5 h-5 fill-current" />
+                        </button>
+                        <button onClick={() => handleNext(false)} className="p-1.5 hover:bg-amber-600 rounded-full transition-colors">
+                            <Icon path={icons.skipForward} className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* Center: Track Name (Marquee) */}
+                    <div className="flex-1 mx-4 overflow-hidden relative h-6">
+                        {currentTrack ? (
+                            <div className="absolute w-full flex items-center h-full">
+                                <div className={`whitespace-nowrap font-bold text-sm md:text-base ${currentTrack.title.length > 15 ? 'animate-marquee' : 'text-center w-full'}`}>
+                                    {currentTrack.title}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="text-center text-sm opacity-80">Loading Music...</div>
+                        )}
+                    </div>
 
-                        {/* Controls */}
-                        <div className="flex items-center gap-2">
-                            <button onClick={prevTrack} className="hover:text-white transition-colors"><Icon path={icons.skipBack} className="w-4 h-4" fill="currentColor"/></button>
-                            <button onClick={() => setIsPlaying(!isPlaying)} className="w-8 h-8 flex items-center justify-center bg-amber-100 text-amber-800 rounded-full hover:scale-105 transition-transform shadow-md">
-                                <Icon path={isPlaying ? icons.pause : icons.play} className="w-4 h-4" fill="currentColor" />
-                            </button>
-                            <button onClick={nextTrack} className="hover:text-white transition-colors"><Icon path={icons.skipForward} className="w-4 h-4" fill="currentColor"/></button>
-                        </div>
-
-                        {/* Volume */}
-                        <div className="flex items-center gap-2 w-16 md:w-24 group">
-                            <Icon path={icons.volume} className="w-4 h-4 text-amber-300" />
-                            <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full h-1 bg-amber-600 rounded-lg appearance-none cursor-pointer" />
-                        </div>
+                    {/* Right: Volume */}
+                    <div className="flex items-center gap-2 flex-shrink-0 w-24 md:w-32">
+                        <Icon path={volume === 0 ? icons.volumeX : icons.volume} className="w-4 h-4 opacity-80" />
+                        <input 
+                            type="range" 
+                            min="0" 
+                            max="1" 
+                            step="0.01" 
+                            value={volume} 
+                            onChange={handleVolumeChange}
+                            className="w-full h-1 bg-amber-300 rounded-lg appearance-none cursor-pointer"
+                        />
                     </div>
                 </div>
             );
-        };
+        });
 
-        // --- Main Views ---
+        // -- Components --
+
         const MenuView = ({ 
             userName, setUserName, showNameWarning, mistakeLog, favorites, parsedData, 
             onStartLearn, onStartQuiz, onViewHistory, onViewMistakes, onViewTable, onPrintExam,
-            onLogin, isLocked, onQuickLogin, lastUser, onLogout, onDeleteUser 
+            onLogin, isLocked, onQuickLogin, lastUser, onLogout, onDeleteUser
         }) => (
-            <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in-up mt-12">
+            <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in-up">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-extrabold text-amber-900 tracking-tight flex items-center gap-3 font-serif drop-shadow-sm">
@@ -386,18 +556,35 @@
                         <div className="mt-6 flex flex-wrap items-center gap-3 p-4 bg-amber-100/80 backdrop-blur-sm rounded-xl border border-amber-200 shadow-sm">
                             <span className="text-amber-900 font-bold text-lg">主公姓名：</span>
                             <div className="relative flex flex-wrap items-center gap-2">
-                                <input type="text" value={userName} onChange={(e) => !isLocked && setUserName(e.target.value)} placeholder="請輸入姓名" disabled={isLocked} className={`border-2 rounded-lg px-4 py-2 outline-none transition-all text-lg w-48 ${isLocked ? 'bg-amber-50 text-gray-500 border-amber-200 cursor-not-allowed font-bold' : (showNameWarning ? 'border-red-500 bg-red-50 ring-2 ring-red-200 animate-shake' : 'border-amber-300 focus:ring-4 focus:ring-amber-200 focus:border-amber-500 bg-white')}`} />
+                                <input 
+                                    type="text" 
+                                    value={userName}
+                                    onChange={(e) => !isLocked && setUserName(e.target.value)}
+                                    placeholder="請輸入姓名"
+                                    disabled={isLocked}
+                                    className={`border-2 rounded-lg px-4 py-2 outline-none transition-all text-lg w-48 ${isLocked ? 'bg-amber-50 text-gray-500 border-amber-200 cursor-not-allowed font-bold' : (showNameWarning ? 'border-red-500 bg-red-50 ring-2 ring-red-200 animate-shake' : 'border-amber-300 focus:ring-4 focus:ring-amber-200 focus:border-amber-500 bg-white')}`}
+                                />
                                 {!isLocked ? (
-                                    <button onClick={onLogin} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-base font-bold flex items-center transition-colors shadow-sm transform active:scale-95"><Icon path={icons.login} className="w-5 h-5 mr-2" fill="currentColor"/> 登入</button>
+                                    <button onClick={onLogin} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-base font-bold flex items-center transition-colors shadow-sm transform active:scale-95">
+                                        <Icon path={icons.login} className="w-5 h-5 mr-2" fill="currentColor"/> 登入
+                                    </button>
                                 ) : (
                                     <div className="flex flex-wrap gap-2">
-                                        <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-bold flex items-center border border-green-200"><Icon path={icons.check} className="w-5 h-5 mr-1.5"/> 已登入</span>
-                                        <button onClick={onLogout} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm"><Icon path={icons.logout} className="w-4 h-4 mr-1.5" fill="currentColor"/> 登出</button>
-                                        <button onClick={onDeleteUser} className="bg-gray-400 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm group" title="刪除使用者"><Icon path={icons.userX} className="w-4 h-4 mr-1.5 group-hover:scale-110 transition-transform" fill="currentColor"/> 刪除</button>
+                                        <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-bold flex items-center border border-green-200">
+                                            <Icon path={icons.check} className="w-5 h-5 mr-1.5"/> 已登入
+                                        </span>
+                                        <button onClick={onLogout} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm">
+                                            <Icon path={icons.logout} className="w-4 h-4 mr-1.5" fill="currentColor"/> 登出
+                                        </button>
+                                        <button onClick={onDeleteUser} className="bg-gray-400 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm group" title="刪除使用者">
+                                            <Icon path={icons.userX} className="w-4 h-4 mr-1.5 group-hover:scale-110 transition-transform" fill="currentColor"/> 刪除
+                                        </button>
                                     </div>
                                 )}
                                 {!isLocked && lastUser && (
-                                    <button onClick={onQuickLogin} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors border border-blue-200"><Icon path={icons.lightning} className="w-4 h-4 mr-1.5" fill="currentColor"/> 快速登入 ({lastUser})</button>
+                                    <button onClick={onQuickLogin} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg text-sm font-bold flex items-center transition-colors border border-blue-200">
+                                        <Icon path={icons.lightning} className="w-4 h-4 mr-1.5" fill="currentColor"/> 快速登入 ({lastUser})
+                                    </button>
                                 )}
                                 {showNameWarning && <div className="absolute left-0 -bottom-8 text-sm text-red-600 font-bold bg-red-100 px-2 py-1 rounded">* 請先輸入姓名並登入</div>}
                             </div>
@@ -409,16 +596,27 @@
                     </div>
                 </div>
 
+                {/* 一覽表按鈕與列印按鈕 */}
                 <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button onClick={onViewTable} className="w-full py-4 bg-purple-600/90 backdrop-blur hover:bg-purple-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-purple-400 group"><Icon path={icons.list} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform"/> 字音一覽表</button>
-                    <button onClick={onPrintExam} className="w-full py-4 bg-blue-600/90 backdrop-blur hover:bg-blue-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-blue-400 group"><Icon path={icons.printer} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform" fill="none" /> 🖨️ 列印考卷 (A4)</button>
+                    <button onClick={onViewTable} className="w-full py-4 bg-purple-600/90 backdrop-blur hover:bg-purple-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-purple-400 group">
+                        <Icon path={icons.list} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform"/> 字音一覽表
+                    </button>
+                    <button onClick={onPrintExam} className="w-full py-4 bg-blue-600/90 backdrop-blur hover:bg-blue-700 text-white rounded-2xl shadow-lg hover:shadow-xl font-bold text-xl flex items-center justify-center transition-all transform active:scale-[0.99] border-2 border-blue-400 group">
+                        <Icon path={icons.printer} className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform" fill="none" /> 🖨️ 列印考卷 (A4)
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* 錦囊收藏卡片 */}
                     <div className="bg-gradient-to-br from-red-50/90 to-orange-50/90 backdrop-blur p-8 rounded-2xl shadow-sm border-2 border-red-100 flex flex-col justify-between hover:border-red-200 transition-colors">
                         <div className="flex items-start mb-6">
-                            <div className="bg-white p-4 rounded-2xl shadow-sm text-red-500 mr-5 border border-red-100"><Icon path={icons.heart} className="w-10 h-10" fill="currentColor"/></div>
-                            <div><h3 className="text-2xl font-black text-gray-800 mb-1">重點收藏</h3><p className="text-gray-600 font-medium">目前收藏了 <span className="text-red-600 font-bold text-xl">{favorites.length}</span> 個語詞</p></div>
+                            <div className="bg-white p-4 rounded-2xl shadow-sm text-red-500 mr-5 border border-red-100">
+                                <Icon path={icons.heart} className="w-10 h-10" fill="currentColor"/>
+                            </div>
+                            <div>
+                                <h3 className="text-2xl font-black text-gray-800 mb-1">重點收藏</h3>
+                                <p className="text-gray-600 font-medium">目前收藏了 <span className="text-red-600 font-bold text-xl">{favorites.length}</span> 個語詞</p>
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4 mt-auto">
                             <button onClick={() => onStartLearn('收藏夾')} disabled={favorites.length===0} className="py-3 bg-white text-red-700 rounded-xl shadow-sm hover:bg-red-50 font-bold text-lg border-2 border-red-100 disabled:opacity-50 disabled:cursor-not-allowed">溫故</button>
@@ -426,88 +624,337 @@
                         </div>
                     </div>
                     
+                    {/* 精選字音卡片 */}
                     <div className="bg-white/90 backdrop-blur p-8 rounded-2xl shadow-sm hover:shadow-xl transition-all border-2 border-amber-200 flex flex-col relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100 rounded-bl-full -mr-12 -mt-12 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
                         <div className="flex justify-between items-start mb-3 relative z-10">
                             <h3 className="text-3xl font-black text-amber-900">精選字音</h3>
                             <span className="text-sm font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full border border-amber-200">共 {Math.ceil(parsedData["精選字音"].length / ITEMS_PER_PAGE)} 關 ({parsedData["精選字音"].length} 題)</span>
                         </div>
-                        <div className="text-gray-500 mb-8 font-medium text-lg relative z-10">包含仝賀、傭人、胸脯...等易混淆字音，增進語文能力。</div>
+                        <div className="text-gray-500 mb-8 font-medium text-lg relative z-10">
+                            包含仝賀、傭人、胸脯...等易混淆字音，增進語文能力。
+                        </div>
                         <div className="grid grid-cols-2 gap-4 mt-auto relative z-10">
                             <button onClick={() => onStartLearn('精選字音')} className="flex items-center justify-center py-3 bg-amber-50 text-amber-900 rounded-xl hover:bg-amber-100 font-bold text-lg border-2 border-amber-200 transition-colors"><Icon path={icons.book} className="w-5 h-5 mr-2"/> 研讀</button>
                             <button onClick={() => onStartQuiz('精選字音')} className="flex items-center justify-center py-3 bg-amber-600 text-white rounded-xl shadow-lg hover:bg-amber-700 font-bold text-lg transform active:scale-95 transition-all"><Icon path={icons.play} className="w-5 h-5 mr-2"/> 開始挑戰</button>
                         </div>
                     </div>
                 </div>
-                <div className="mt-12 text-center text-gray-500 text-sm font-medium bg-white/50 backdrop-blur rounded-full py-2 inline-block px-6 mx-auto w-full md:w-auto">&copy; 2025 字音大師 • 互動式學習系統</div>
+                
+                <div className="mt-12 text-center text-gray-500 text-sm font-medium bg-white/50 backdrop-blur rounded-full py-2 inline-block px-6 mx-auto w-full md:w-auto">
+                    &copy; 2025 字音大師 • 互動式學習系統
+                </div>
             </div>
         );
 
-        // --- Restored Views ---
-
-        const LearnView = ({ items, learnPage, setLearnPage, favorites, toggleFavorite, completedDays, onMenu }) => {
-            const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
-            const currentItems = items.slice(learnPage * ITEMS_PER_PAGE, (learnPage + 1) * ITEMS_PER_PAGE);
-            const scrollRef = useRef(null);
-            useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; window.scrollTo(0, 0); }, [learnPage]);
-
-            if (items.length === 0) return <div className="p-10 text-center"><h2 className="text-2xl mb-4">此分類無資料</h2><button onClick={onMenu} className="px-4 py-2 bg-gray-200 rounded">返回</button></div>;
+        // --- Print Exam View (Optimized for space) ---
+        const PrintExamView = ({ items, onMenu }) => {
+            useEffect(() => {
+                setTimeout(() => {
+                    window.print();
+                }, 500);
+            }, []);
 
             return (
-                <div className="max-w-4xl mx-auto px-4 py-6 mt-16" ref={scrollRef}>
-                    <div className="bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-sm mb-8 flex flex-col md:flex-row justify-between items-center sticky top-16 z-30 border-b-2 border-amber-200">
-                        <div className="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto">
-                            <button onClick={onMenu} className="text-gray-500 hover:text-gray-900 flex items-center whitespace-nowrap bg-gray-100 px-3 py-2 rounded-lg font-bold"><Icon path={icons.menu} className="w-5 h-5 mr-2"/> 選單</button>
-                            <h2 className="text-2xl font-black flex items-center whitespace-nowrap text-amber-900">📖 卷軸</h2>
-                        </div>
-                        <div className="flex overflow-x-auto max-w-full w-full md:w-auto pb-2 md:pb-0 gap-2 mt-2 md:mt-0 no-scrollbar">
-                            {Array.from({ length: totalPages }).map((_, i) => (
-                                <button key={i} onClick={() => setLearnPage(i)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2 transition-all flex-shrink-0 ${learnPage === i ? 'bg-amber-600 text-white shadow-md transform scale-105' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>第 {i + 1} 關 {completedDays.includes(`精選字音-${i}`) && <span className="bg-green-400 text-white text-[10px] px-1.5 py-0.5 rounded-full">✓</span>}</button>
-                            ))}
-                        </div>
+                <div className="print-exam-container bg-white min-h-screen text-black">
+                    <div className="no-print p-4 bg-gray-100 border-b flex justify-between items-center fixed top-14 w-full z-40">
+                        <button onClick={onMenu} className="flex items-center text-gray-600 hover:text-gray-900 font-bold bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors shadow-sm">
+                            <Icon path={icons.left} className="w-5 h-5 mr-2"/> 返回
+                        </button>
+                        <div className="font-bold text-gray-700">準備列印... (如未彈出請按 Ctrl+P)</div>
+                        <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">
+                            手動列印
+                        </button>
                     </div>
-                    <div className="space-y-8">
-                        {currentItems.map((item, idx) => (
-                            <div key={item.id} className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 md:p-8 shadow-sm border border-amber-100 relative group hover:shadow-lg transition-all animate-fade-in-up" style={{animationDelay: `${idx * 0.05}s`}}>
-                                <button onClick={() => toggleFavorite(item.id)} className="absolute top-6 right-6 text-gray-200 hover:text-red-500 z-10 transition-colors"><Icon path={icons.heart} className={`w-8 h-8 drop-shadow-sm ${favorites.includes(item.id) ? "text-red-500" : ""}`} fill={favorites.includes(item.id) ? "currentColor" : "none"} /></button>
-                                <div className="flex flex-col md:flex-row gap-8">
-                                    <div className="flex-1">
-                                        <div className="flex items-baseline gap-3 mb-3 flex-wrap pr-10"><span className="text-amber-300 font-mono text-xl font-black">#{String(item.id).padStart(3,'0')}</span><h3 className="text-4xl font-black text-gray-900 tracking-tight flex items-baseline gap-4"><HighlightedTerm term={item.term} targetChar={item.targetChar} /></h3></div>
-                                        <div className="mb-6 space-y-2"><div className="flex items-center gap-2 text-xl font-medium text-amber-800"><span className="bg-red-100 text-red-600 px-2 py-0.5 rounded text-sm font-bold">重點注音</span><span className="bopomofo font-bold">{item.targetZhuyin}</span></div><div className="flex items-center gap-2 text-lg text-gray-600"><span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded text-sm font-bold">完整注音</span><span className="bopomofo">{item.fullZhuyin}</span></div></div>
-                                        <div className="bg-gradient-to-r from-amber-50 to-transparent p-4 rounded-xl text-amber-900 mb-4 text-lg font-medium border-l-8 border-amber-400">{item.definition}</div>
-                                        <div className="text-gray-600 leading-relaxed pl-4 italic border-l-4 border-gray-300 text-lg bg-gray-50 py-2 pr-2 rounded-r-lg"><span className="font-bold not-italic text-gray-400 mr-2 text-sm">例句</span>{item.sentence && <HighlightedTerm term={item.sentence} targetChar={item.term} className="text-gray-800 not-italic"/>}</div>
-                                    </div>
-                                    <div className="w-full md:w-80 flex-shrink-0 flex flex-col items-center"><div className="bg-white p-2 border-2 border-gray-100 rounded-2xl w-full shadow-sm"><div className="rounded-xl overflow-hidden bg-gray-200 aspect-[4/3] relative group-img cursor-pointer w-full"><img src={`images/${item.image}`} alt={item.scene} loading="lazy" className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" onError={(e) => { e.target.onerror = null; e.target.parentNode.innerHTML = `<div class="w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400 p-4 text-center"><span class="text-xs font-medium text-gray-500 leading-tight">${item.scene}</span></div>`; }} /></div><div className="mt-2 text-xs text-gray-400 text-justify px-1 leading-relaxed border-t border-gray-100 pt-2"><span className="font-bold mr-1">圖說:</span>{item.scene}</div></div></div>
-                                </div>
+                    
+                    {/* 列印內容區域 - 縮小字體與間距 */}
+                    <div className="max-w-[210mm] mx-auto pt-4 pb-4 px-6 print-only" style={{ display: 'block' }}>
+                        <div className="text-center mb-4 border-b-2 border-black pb-2">
+                            <h1 className="text-2xl font-black mb-2 font-serif">字音大師 - 易混淆字音手寫測驗</h1>
+                            <div className="flex justify-between text-base font-bold">
+                                <span>班級：__________</span>
+                                <span>座號：__________</span>
+                                <span>姓名：__________</span>
+                                <span>得分：__________</span>
                             </div>
-                        ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-base">
+                            {items.map((item, index) => {
+                                const parts = item.term.split(item.targetChar);
+                                const questionText = (
+                                    <span>
+                                        {parts.map((part, i) => (
+                                            <React.Fragment key={i}>
+                                                {part}
+                                                {i < parts.length - 1 && (
+                                                    <span className="font-bold font-serif mx-1">「{item.targetZhuyin}」</span>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </span>
+                                );
+
+                                return (
+                                    <div key={item.id} className="flex items-center border-b border-gray-300 py-1 break-inside-avoid print-border">
+                                        <div className="w-6 font-bold text-gray-600 text-sm">{item.id}.</div>
+                                        <div className="flex-1 font-medium tracking-wide">
+                                            {questionText}
+                                        </div>
+                                        {/* 縮小手寫框 */}
+                                        <div className="w-10 h-10 border border-black ml-2 rounded-sm bg-white print-border"></div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        
+                        <div className="mt-4 text-center text-xs text-gray-400">
+                            - 試卷結束 - 共 {items.length} 題
+                        </div>
                     </div>
-                    <div className="h-20"></div>
                 </div>
             );
         };
 
-        const QuizView = ({ questions, score, userName, combo, onAnswer, onFinish, onMenu, onViewHistory, favorites, toggleFavorite, totalItems, quizPage, onPageChange, completedDays }) => {
+        // TableView 組件
+        const TableView = ({ items, onMenu, favorites, toggleFavorite }) => {
+            const [searchTerm, setSearchTerm] = useState("");
+            
+            const filteredItems = useMemo(() => {
+                if (!searchTerm.trim()) return items;
+                const lowerTerm = searchTerm.toLowerCase();
+                return items.filter(item => 
+                    String(item.id).includes(lowerTerm) ||
+                    item.term.includes(lowerTerm) ||
+                    item.definition.includes(lowerTerm) ||
+                    item.targetZhuyin.includes(lowerTerm)
+                );
+            }, [items, searchTerm]);
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in-up">
+                    <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden border border-gray-200 flex flex-col h-[85vh]">
+                        {/* Header & Search */}
+                        <div className="p-6 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-4 w-full md:w-auto">
+                                <button onClick={onMenu} className="flex items-center text-gray-600 hover:text-gray-900 font-bold bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors shadow-sm">
+                                    <Icon path={icons.left} className="w-5 h-5 mr-2"/> 返回
+                                </button>
+                                <h2 className="text-2xl font-black text-gray-800 flex items-center">
+                                    <Icon path={icons.list} className="w-6 h-6 mr-3 text-purple-600"/>
+                                    字音一覽表
+                                    <span className="ml-3 text-sm font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">共 {items.length} 則</span>
+                                </h2>
+                            </div>
+                            <div className="relative w-full md:w-96">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                    <Icon path={icons.search} className="w-5 h-5"/>
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="搜尋語詞、注音..."
+                                    className="pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl w-full focus:ring-4 focus:ring-purple-100 focus:border-purple-500 outline-none transition-all"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Table Content */}
+                        <div className="flex-1 overflow-auto bg-white p-0">
+                            <table className="w-full text-left border-collapse prose-table">
+                                <thead className="bg-purple-50 sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-24 text-center">編號</th>
+                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-48">語詞 (重點)</th>
+                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-32">正確注音</th>
+                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-48">完整注音</th>
+                                        <th className="p-4 font-black text-purple-900 border-b-2 border-purple-100">釋義與例句</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredItems.length > 0 ? (
+                                        filteredItems.map(item => (
+                                            <tr key={item.id} className="hover:bg-purple-50/50 transition-colors">
+                                                <td className="p-4 text-center font-mono text-gray-500 font-bold bg-gray-50/50">
+                                                    <div className="flex items-center justify-center gap-2 cursor-pointer group" onClick={() => toggleFavorite(item.id)} title={favorites.includes(item.id) ? "取消收藏" : "加入收藏"}>
+                                                        <Icon 
+                                                            path={icons.heart} 
+                                                            className={`w-5 h-5 transition-all ${favorites.includes(item.id) ? "text-red-500 fill-current scale-110" : "text-gray-300 group-hover:text-red-300"}`} 
+                                                            fill={favorites.includes(item.id) ? "currentColor" : "none"}
+                                                        />
+                                                        {String(item.id).padStart(3, '0')}
+                                                    </div>
+                                                </td>
+                                                <td className="p-4 font-bold text-gray-900 text-lg sticky left-0 bg-white md:static">
+                                                    <HighlightedTerm term={item.term} targetChar={item.targetChar} />
+                                                </td>
+                                                <td className="p-4 font-black text-red-600 bopomofo">{item.targetZhuyin}</td>
+                                                <td className="p-4 text-gray-700 bopomofo">{item.fullZhuyin}</td>
+                                                <td className="p-4 leading-relaxed">
+                                                    <div className="text-gray-800 text-lg font-medium mb-2">{item.definition}</div>
+                                                    {item.sentence && (
+                                                        <div className="mt-1.5 text-gray-600 bg-gray-100/50 p-3 rounded-lg text-base">
+                                                            <span className="font-bold text-gray-700 mr-1">例:</span>
+                                                            <HighlightedTerm term={item.sentence} targetChar={item.term} />
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="5" className="p-12 text-center text-gray-400">
+                                                <div className="flex flex-col items-center">
+                                                    <Icon path={icons.search} className="w-12 h-12 mb-2 opacity-50"/>
+                                                    <span className="text-lg">找不到符合「{searchTerm}」的資料</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="bg-gray-50 p-2 text-center text-xs text-gray-400 border-t border-gray-200">
+                            顯示 {filteredItems.length} 筆資料
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        const LearnView = ({ 
+            items, learnPage, setLearnPage, favorites, toggleFavorite, completedDays, onMenu 
+        }) => (
+            <div className="max-w-4xl mx-auto px-4 py-6">
+                <div className="bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-sm mb-8 flex flex-col md:flex-row justify-between items-center sticky top-14 z-30 border-b-2 border-amber-200">
+                    <div className="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto">
+                        <button onClick={onMenu} className="text-gray-500 hover:text-gray-900 flex items-center whitespace-nowrap bg-gray-100 px-3 py-2 rounded-lg font-bold"><Icon path={icons.menu} className="w-5 h-5 mr-2"/> 選單</button>
+                        <h2 className="text-2xl font-black flex items-center whitespace-nowrap text-amber-900">
+                            📖 卷軸
+                        </h2>
+                    </div>
+                    
+                    <div className="flex overflow-x-auto max-w-full w-full md:w-auto pb-2 md:pb-0 gap-2 mt-2 md:mt-0 no-scrollbar">
+                        {Array.from({ length: Math.ceil(items.length / ITEMS_PER_PAGE) }).map((_, i) => {
+                            const isCompleted = completedDays.includes(`精選字音-${i}`);
+                            return (<button key={i} onClick={() => setLearnPage(i)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2 transition-all flex-shrink-0 ${learnPage === i ? 'bg-amber-600 text-white shadow-md transform scale-105' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>第 {i + 1} 關 {isCompleted && <span className="bg-green-400 text-white text-[10px] px-1.5 py-0.5 rounded-full">✓</span>}</button>);
+                        })}
+                    </div>
+                </div>
+                
+                <div className="space-y-8">
+                    {items.slice(learnPage * ITEMS_PER_PAGE, (learnPage + 1) * ITEMS_PER_PAGE).map((item, idx) => (
+                        <div key={item.id} className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 md:p-8 shadow-sm border border-amber-100 relative group hover:shadow-lg transition-all animate-fade-in-up" style={{animationDelay: `${idx * 0.05}s`}}>
+                            <button onClick={() => toggleFavorite(item.id)} className="absolute top-6 right-6 text-gray-200 hover:text-red-500 z-10 transition-colors">
+                                <Icon path={icons.heart} className={`w-8 h-8 drop-shadow-sm ${favorites.includes(item.id) ? "text-red-500" : ""}`} fill={favorites.includes(item.id) ? "currentColor" : "none"} />
+                            </button>
+                            <div className="flex flex-col md:flex-row gap-8">
+                                <div className="flex-1">
+                                    <div className="flex items-baseline gap-3 mb-3 flex-wrap pr-10">
+                                        <span className="text-amber-300 font-mono text-xl font-black">#{String(item.id).padStart(3,'0')}</span>
+                                        <h3 className="text-4xl font-black text-gray-900 tracking-tight flex items-baseline gap-4">
+                                            <HighlightedTerm term={item.term} targetChar={item.targetChar} />
+                                        </h3>
+                                    </div>
+                                    
+                                    <div className="mb-6 space-y-2">
+                                        <div className="flex items-center gap-2 text-xl font-medium text-amber-800">
+                                            <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded text-sm font-bold">重點注音</span>
+                                            <span className="bopomofo font-bold">{item.targetZhuyin}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-lg text-gray-600">
+                                            <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded text-sm font-bold">完整注音</span>
+                                            <span className="bopomofo">{item.fullZhuyin}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-gradient-to-r from-amber-50 to-transparent p-4 rounded-xl text-amber-900 mb-4 text-lg font-medium border-l-8 border-amber-400">
+                                        {item.definition}
+                                    </div>
+                                    
+                                    <div className="text-gray-600 leading-relaxed pl-4 italic border-l-4 border-gray-300 text-lg bg-gray-50 py-2 pr-2 rounded-r-lg">
+                                        <span className="font-bold not-italic text-gray-400 mr-2 text-sm">例句</span>
+                                        {item.sentence && <HighlightedTerm term={item.sentence} targetChar={item.term} className="text-gray-800 not-italic"/>}
+                                    </div>
+                                </div>
+                                
+                                <div className="w-full md:w-80 flex-shrink-0 flex flex-col items-center">
+                                    <div className="bg-white p-2 border-2 border-gray-100 rounded-2xl w-full shadow-sm">
+                                        <div className="rounded-xl overflow-hidden bg-gray-200 aspect-[4/3] relative group-img cursor-pointer w-full">
+                                            <img 
+                                                src={`images/${item.image}`}
+                                                alt={item.scene} 
+                                                loading="lazy"
+                                                className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+                                                onError={(e) => {
+                                                    e.target.onerror = null; 
+                                                    e.target.parentNode.innerHTML = `
+                                                        <div class="w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400 p-4 text-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-2 opacity-50"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                                            <span class="text-xs font-medium text-gray-500 leading-tight">${item.scene}</span>
+                                                        </div>
+                                                    `;
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="mt-2 text-xs text-gray-400 text-justify px-1 leading-relaxed border-t border-gray-100 pt-2">
+                                            <span className="font-bold mr-1">圖說:</span>{item.scene}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="h-20"></div>
+            </div>
+        );
+
+        const QuizView = ({ 
+            questions, score, userName, combo, onAnswer, onFinish, onMenu, onViewHistory, favorites, toggleFavorite,
+            totalItems, quizPage, onPageChange, completedDays 
+        }) => {
             const [showResult, setShowResult] = useState(false);
             const isFinished = questions.length > 0 && questions.every(q => q.userAnswer !== null);
             const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
             useEffect(() => { 
                 if (isFinished && !showResult) { 
-                    const timer = setTimeout(() => { onFinish(); setShowResult(true); }, 800); 
+                    const timer = setTimeout(() => {
+                        onFinish(); 
+                        setShowResult(true); 
+                    }, 800); 
                     return () => clearTimeout(timer);
                 } 
             }, [isFinished]);
 
             if (showResult) {
-                return (
-                    <div className="max-w-2xl mx-auto pt-24 px-4 animate-fade-in-up">
+                 return (
+                    <div className="max-w-2xl mx-auto pt-10 px-4 animate-fade-in-up">
                         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden text-center border-4 border-amber-400">
-                            <div className="bg-amber-500 p-10 text-white relative overflow-hidden"><h2 className="text-4xl font-black mb-2 font-serif relative z-10">戰役結束</h2><p className="opacity-90 font-bold text-lg relative z-10">主公 {userName} 辛苦了</p></div>
+                            <div className="bg-amber-500 p-10 text-white relative overflow-hidden">
+                                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                                <h2 className="text-4xl font-black mb-2 font-serif relative z-10">戰役結束</h2>
+                                <p className="opacity-90 font-bold text-lg relative z-10">主公 {userName} 辛苦了</p>
+                            </div>
                             <div className="p-10">
                                 <div className="text-8xl font-black text-amber-600 mb-2 font-mono tracking-tighter">{score} <span className="text-3xl text-gray-300 font-bold">/ {questions.length}</span></div>
-                                <div className="flex justify-center gap-4 mb-10"><div className="flex-1 bg-green-50 text-green-700 py-4 rounded-2xl font-black text-xl border-2 border-green-200">大捷 {score}</div><div className="flex-1 bg-red-50 text-red-700 py-4 rounded-2xl font-black text-xl border-2 border-red-200">失利 {questions.length - score}</div></div>
-                                <div className="flex flex-col gap-4"><button onClick={onMenu} className="w-full py-4 bg-gray-100 hover:bg-gray-200 rounded-2xl font-black text-gray-700 text-xl transition-colors">返回大營</button><button onClick={onViewHistory} className="w-full py-4 bg-amber-600 hover:bg-amber-700 rounded-2xl font-black text-white shadow-xl shadow-amber-200 text-xl transition-all transform active:scale-95">查看詳細戰報</button></div>
+                                <div className="text-gray-400 font-bold mb-8 uppercase tracking-widest">本次戰功</div>
+                                
+                                <div className="flex justify-center gap-4 mb-10">
+                                    <div className="flex-1 bg-green-50 text-green-700 py-4 rounded-2xl font-black text-xl border-2 border-green-200">
+                                        大捷 {score}
+                                    </div>
+                                    <div className="flex-1 bg-red-50 text-red-700 py-4 rounded-2xl font-black text-xl border-2 border-red-200">
+                                        失利 {questions.length - score}
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-col gap-4">
+                                    <button onClick={onMenu} className="w-full py-4 bg-gray-100 hover:bg-gray-200 rounded-2xl font-black text-gray-700 text-xl transition-colors">返回大營</button>
+                                    <button onClick={onViewHistory} className="w-full py-4 bg-amber-600 hover:bg-amber-700 rounded-2xl font-black text-white shadow-xl shadow-amber-200 text-xl transition-all transform active:scale-95">查看詳細戰報</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -515,26 +962,53 @@
             }
 
             return (
-                <div className="max-w-4xl mx-auto pb-20 px-4 mt-16">
-                    <div className="bg-white/95 backdrop-blur shadow-sm p-4 rounded-b-2xl mb-8 sticky top-16 z-30 border-t-4 border-amber-500 flex flex-col md:flex-row justify-between items-center transition-all">
+                <div className="max-w-4xl mx-auto pb-20 px-4">
+                    <div className="bg-white/95 backdrop-blur shadow-sm p-4 rounded-b-2xl mb-8 sticky top-14 z-30 border-t-4 border-amber-500 flex flex-col md:flex-row justify-between items-center transition-all">
                         <div className="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto justify-between md:justify-start">
                             <button onClick={onMenu} className="text-gray-500 text-sm flex items-center hover:text-red-600 font-bold bg-gray-100 px-3 py-2 rounded-lg transition-colors"><Icon path={icons.left} className="w-4 h-4 mr-1"/> 撤退</button>
-                            <div className="font-bold text-xl flex items-center gap-3"><span>{userName}</span><span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-black border border-amber-200">戰功: {score}</span></div>
-                            <div className="w-24 text-right">{combo > 1 && <div className="text-orange-600 font-black animate-pop text-2xl drop-shadow-sm inline-block">🔥 x{combo}</div>}</div>
+                            <div className="font-bold text-xl flex items-center gap-3">
+                                <span>{userName}</span>
+                                <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-black border border-amber-200">戰功: {score}</span>
+                            </div>
+                            <div className="w-24 text-right">
+                                {combo > 1 && <div className="text-orange-600 font-black animate-pop text-2xl drop-shadow-sm inline-block">🔥 x{combo}</div>}
+                            </div>
                         </div>
                         <div className="flex overflow-x-auto max-w-full w-full md:w-auto pb-1 md:pb-0 gap-2 no-scrollbar">
-                            {Array.from({ length: totalPages }).map((_, i) => (
-                                <button key={i} onClick={() => onPageChange(i)} className={`px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all flex-shrink-0 ${quizPage === i ? 'bg-amber-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>第{i + 1}關 {completedDays.includes(`精選字音-${i}`) && <span className="bg-green-400 text-white text-[10px] w-3 h-3 flex items-center justify-center rounded-full">✓</span>}</button>
-                            ))}
+                             {Array.from({ length: totalPages }).map((_, i) => {
+                                const isCompleted = completedDays.includes(`精選字音-${i}`);
+                                return (
+                                    <button key={i} onClick={() => onPageChange(i)} 
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all flex-shrink-0
+                                        ${quizPage === i ? 'bg-amber-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                                        第{i + 1}關
+                                        {isCompleted && <span className="bg-green-400 text-white text-[10px] w-3 h-3 flex items-center justify-center rounded-full">✓</span>}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
+
                     <div className="space-y-8">
                         {questions.map((q, idx) => (
                             <div key={idx} className={`bg-white/95 backdrop-blur-sm rounded-3xl shadow-sm border-4 overflow-hidden transition-all duration-500 relative ${q.userAnswer === null ? 'border-transparent shadow-md' : (q.isCorrect ? 'border-green-200 bg-green-50/20' : 'border-red-200 bg-red-50/20')}`}>
-                                <button onClick={() => toggleFavorite(q.id)} className={`absolute top-5 right-5 z-10 transition-colors p-2 rounded-full bg-white/50 hover:bg-white ${favorites.includes(q.id) ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}><Icon path={icons.heart} className="w-7 h-7" fill={favorites.includes(q.id) ? "currentColor" : "none"} /></button>
+                                <button onClick={() => toggleFavorite(q.id)} className={`absolute top-5 right-5 z-10 transition-colors p-2 rounded-full bg-white/50 hover:bg-white ${favorites.includes(q.id) ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}>
+                                    <Icon path={icons.heart} className="w-7 h-7" fill={favorites.includes(q.id) ? "currentColor" : "none"} />
+                                </button>
                                 <div className="p-8 border-b border-gray-100">
-                                    <div className="flex justify-between items-center mb-6"><span className="font-black text-amber-900 tracking-wider text-sm bg-amber-100 px-3 py-1 rounded-full border border-amber-200">問題 {idx + 1}</span>{q.userAnswer !== null && (q.isCorrect ? <span className="text-green-600 font-black flex items-center text-lg animate-pop mr-12"><Icon path={icons.check} className="w-6 h-6 mr-1"/> 正確</span> : <span className="text-red-600 font-black flex items-center text-lg animate-shake mr-12"><Icon path={icons.alert} className="w-6 h-6 mr-1"/> 錯誤</span>)}</div>
-                                    <div className="text-center"><div className="text-gray-500 mb-2 font-bold">請選出紅色字的正確讀音</div><div className="text-5xl md:text-6xl font-black text-gray-800 leading-relaxed mb-4"><HighlightedTerm term={q.term} targetChar={q.targetChar} /></div></div>
+                                    <div className="flex justify-between items-center mb-6">
+                                        <span className="font-black text-amber-900 tracking-wider text-sm bg-amber-100 px-3 py-1 rounded-full border border-amber-200">問題 {idx + 1}</span>
+                                        {q.userAnswer !== null && (q.isCorrect ? 
+                                            <span className="text-green-600 font-black flex items-center text-lg animate-pop mr-12"><Icon path={icons.check} className="w-6 h-6 mr-1"/> 正確</span> : 
+                                            <span className="text-red-600 font-black flex items-center text-lg animate-shake mr-12"><Icon path={icons.alert} className="w-6 h-6 mr-1"/> 錯誤</span>
+                                        )}
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-gray-500 mb-2 font-bold">請選出紅色字的正確讀音</div>
+                                        <div className="text-5xl md:text-6xl font-black text-gray-800 leading-relaxed mb-4">
+                                            <HighlightedTerm term={q.term} targetChar={q.targetChar} />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="p-6 bg-gray-50/50">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -542,15 +1016,47 @@
                                             let btnClass = "p-5 rounded-2xl border-2 text-center font-bold text-2xl transition-all relative overflow-hidden bopomofo "; 
                                             if (q.userAnswer === null) btnClass += "bg-white border-gray-200 hover:border-amber-400 hover:shadow-md cursor-pointer active:scale-[0.98] text-gray-700";
                                             else { 
+                                                // 選項判斷邏輯：id 這裡儲存的是注音字串
                                                 if (opt.id === q.targetZhuyin) btnClass += "bg-green-100 border-green-500 text-green-800 ring-2 ring-green-200 shadow-md"; 
                                                 else if (opt.id === q.userAnswer) btnClass += "bg-red-100 border-red-500 text-red-800 opacity-80"; 
                                                 else btnClass += "bg-gray-50 border-gray-200 text-gray-300 opacity-40 grayscale"; 
                                             }
-                                            return (<button key={opt.id} onClick={() => onAnswer(idx, opt.id)} disabled={q.userAnswer !== null} className={btnClass}>{opt.text}{q.userAnswer !== null && opt.id === q.targetZhuyin && <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600 bg-white rounded-full p-1"><Icon path={icons.check} className="w-5 h-5"/></div>}</button>)
+                                            return (
+                                                <button key={opt.id} onClick={() => onAnswer(idx, opt.id)} disabled={q.userAnswer !== null} className={btnClass}>
+                                                    {opt.text}
+                                                    {q.userAnswer !== null && opt.id === q.targetZhuyin && <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600 bg-white rounded-full p-1"><Icon path={icons.check} className="w-5 h-5"/></div>}
+                                                </button>
+                                            )
                                         })}
                                     </div>
                                 </div>
-                                {q.userAnswer !== null && (<div className={`p-6 border-t animate-fade-in-up ${q.isCorrect ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}><div className="bg-white rounded-xl p-5 border border-gray-200 flex flex-col md:flex-row gap-5 items-start shadow-sm"><div className="w-full md:w-40 aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex-shrink-0"><img src={`images/${q.image}`} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.parentNode.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs p-2 text-center leading-tight">${q.scene}</div>`; }} /></div><div className="flex-1"><div className="text-sm font-black text-gray-500 mb-1 flex items-center gap-2 uppercase tracking-wide"><Icon path={icons.book} className="w-4 h-4"/> 詳解</div><div className="flex flex-wrap items-baseline gap-4 mb-2"><div className="text-3xl font-black text-gray-900">{q.term}</div><div className="text-xl font-bold text-red-600 bopomofo">{q.fullZhuyin}</div></div><div className="text-gray-800 text-xl leading-relaxed mb-3 font-medium"><span className="font-bold text-gray-900">釋義：</span>{q.definition}</div><div className="text-gray-600 text-lg italic"><span className="font-bold not-italic text-gray-500">例句：</span>{q.sentence}</div></div></div></div>)}
+                                {q.userAnswer !== null && (
+                                    <div className={`p-6 border-t animate-fade-in-up ${q.isCorrect ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
+                                        <div className="bg-white rounded-xl p-5 border border-gray-200 flex flex-col md:flex-row gap-5 items-start shadow-sm">
+                                            <div className="w-full md:w-40 aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex-shrink-0">
+                                                <img 
+                                                    src={`images/${q.image}`}
+                                                    className="w-full h-full object-cover" 
+                                                    onError={(e) => {
+                                                        e.target.onerror = null; 
+                                                        e.target.parentNode.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs p-2 text-center leading-tight">${q.scene}</div>`;
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="text-sm font-black text-gray-500 mb-1 flex items-center gap-2 uppercase tracking-wide">
+                                                    <Icon path={icons.book} className="w-4 h-4"/> 詳解
+                                                </div>
+                                                <div className="flex flex-wrap items-baseline gap-4 mb-2">
+                                                    <div className="text-3xl font-black text-gray-900">{q.term}</div>
+                                                    <div className="text-xl font-bold text-red-600 bopomofo">{q.fullZhuyin}</div>
+                                                </div>
+                                                <div className="text-gray-800 text-xl leading-relaxed mb-3 font-medium"><span className="font-bold text-gray-900">釋義：</span>{q.definition}</div>
+                                                <div className="text-gray-600 text-lg italic"><span className="font-bold not-italic text-gray-500">例句：</span>{q.sentence}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -558,181 +1064,351 @@
             );
         };
 
-        const TableView = ({ items, onMenu, favorites, toggleFavorite }) => {
-            const [searchTerm, setSearchTerm] = useState("");
-            const filteredItems = useMemo(() => {
-                if (!searchTerm.trim()) return items;
-                const lowerTerm = searchTerm.toLowerCase();
-                return items.filter(item => String(item.id).includes(lowerTerm) || item.term.includes(lowerTerm) || item.definition.includes(lowerTerm) || item.targetZhuyin.includes(lowerTerm));
-            }, [items, searchTerm]);
-
-            return (
-                <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in-up mt-16">
-                    <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden border border-gray-200 flex flex-col h-[85vh]">
-                        <div className="p-6 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div className="flex items-center gap-4 w-full md:w-auto"><button onClick={onMenu} className="flex items-center text-gray-600 hover:text-gray-900 font-bold bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors shadow-sm"><Icon path={icons.left} className="w-5 h-5 mr-2"/> 返回</button><h2 className="text-2xl font-black text-gray-800 flex items-center"><Icon path={icons.list} className="w-6 h-6 mr-3 text-purple-600"/>字音一覽表<span className="ml-3 text-sm font-normal text-gray-500 bg-gray-200 px-2 py-1 rounded-full">共 {items.length} 則</span></h2></div>
-                            <div className="relative w-full md:w-96"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Icon path={icons.search} className="w-5 h-5"/></div><input type="text" placeholder="搜尋語詞、注音..." className="pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl w-full focus:ring-4 focus:ring-purple-100 focus:border-purple-500 outline-none transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-                        </div>
-                        <div className="flex-1 overflow-auto bg-white p-0">
-                            <table className="w-full text-left border-collapse prose-table">
-                                <thead className="bg-purple-50 sticky top-0 z-10 shadow-sm"><tr><th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-24 text-center">編號</th><th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-48">語詞 (重點)</th><th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-32">正確注音</th><th className="p-4 font-black text-purple-900 border-b-2 border-purple-100 w-48">完整注音</th><th className="p-4 font-black text-purple-900 border-b-2 border-purple-100">釋義與例句</th></tr></thead>
-                                <tbody className="divide-y divide-gray-100">{filteredItems.length > 0 ? (filteredItems.map(item => (<tr key={item.id} className="hover:bg-purple-50/50 transition-colors"><td className="p-4 text-center font-mono text-gray-500 font-bold bg-gray-50/50"><div className="flex items-center justify-center gap-2 cursor-pointer group" onClick={() => toggleFavorite(item.id)} title={favorites.includes(item.id) ? "取消收藏" : "加入收藏"}><Icon path={icons.heart} className={`w-5 h-5 transition-all ${favorites.includes(item.id) ? "text-red-500 fill-current scale-110" : "text-gray-300 group-hover:text-red-300"}`} fill={favorites.includes(item.id) ? "currentColor" : "none"}/>{String(item.id).padStart(3, '0')}</div></td><td className="p-4 font-bold text-gray-900 text-lg sticky left-0 bg-white md:static"><HighlightTerm term={item.term} targetChar={item.targetChar} /></td><td className="p-4 font-black text-red-600 bopomofo">{item.targetZhuyin}</td><td className="p-4 text-gray-700 bopomofo">{item.fullZhuyin}</td><td className="p-4 leading-relaxed"><div className="text-gray-800 text-lg font-medium mb-2">{item.definition}</div>{item.sentence && (<div className="mt-1.5 text-gray-600 bg-gray-100/50 p-3 rounded-lg text-base"><span className="font-bold text-gray-700 mr-1">例:</span><HighlightTerm term={item.sentence} targetChar={item.term} /></div>)}</td></tr>))) : (<tr><td colSpan="5" className="p-12 text-center text-gray-400"><div className="flex flex-col items-center"><Icon path={icons.search} className="w-12 h-12 mb-2 opacity-50"/><span className="text-lg">找不到符合「{searchTerm}」的資料</span></div></td></tr>)}</tbody>
-                            </table>
-                        </div>
-                        <div className="bg-gray-50 p-2 text-center text-xs text-gray-400 border-t border-gray-200">顯示 {filteredItems.length} 筆資料</div>
-                    </div>
-                </div>
-            );
-        };
-
-        const PrintExamView = ({ items, onMenu }) => {
-            useEffect(() => { setTimeout(() => { window.print(); }, 500); }, []);
-            return (
-                <div className="print-exam-container bg-white min-h-screen text-black mt-16">
-                    <div className="no-print p-4 bg-gray-100 border-b flex justify-between items-center fixed top-0 w-full z-50">
-                        <button onClick={onMenu} className="flex items-center text-gray-600 hover:text-gray-900 font-bold bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors shadow-sm"><Icon path={icons.left} className="w-5 h-5 mr-2"/> 返回</button>
-                        <div className="font-bold text-gray-700">準備列印... (如未彈出請按 Ctrl+P)</div>
-                        <button onClick={() => window.print()} className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">手動列印</button>
-                    </div>
-                    <div className="max-w-[210mm] mx-auto pt-4 pb-4 px-8 print-only" style={{ display: 'block' }}>
-                        <div className="text-center mb-4 border-b-2 border-black pb-2">
-                            <h1 className="text-2xl font-black mb-2 font-serif">字音大師 - 易混淆字音手寫測驗</h1>
-                            <div className="flex justify-between text-base font-bold"><span>班級：__________</span><span>座號：__________</span><span>姓名：__________</span><span>得分：__________</span></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                            {items.map((item, index) => {
-                                const parts = item.term.split(item.targetChar);
-                                const questionText = (<span>{parts.map((part, i) => (<React.Fragment key={i}>{part}{i < parts.length - 1 && (<span className="font-bold font-serif mx-1">「{item.targetZhuyin}」</span>)}</React.Fragment>))}</span>);
-                                return (
-                                    <div key={item.id} className="flex items-end border-b border-gray-300 pb-1 break-inside-avoid">
-                                        <div className="w-6 font-bold text-gray-500">{item.id}.</div>
-                                        <div className="flex-1 font-medium tracking-wide">{questionText}</div>
-                                        <div className="w-10 h-10 border-2 border-black ml-1 rounded-md bg-white"></div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="mt-4 text-center text-xs text-gray-400">- 試卷結束 - 共 {items.length} 題</div>
-                    </div>
-                </div>
-            );
-        };
-
         const HistoryView = ({ historyLog, setHistoryLog, onMenu }) => {
             const [selectedLog, setSelectedLog] = useState(null);
+            
             if (selectedLog) {
                 return (
-                    <div className="w-full max-w-4xl mx-auto bg-white/95 backdrop-blur-md min-h-screen p-6 md:p-8 shadow-2xl animate-fade-in-up mt-16">
-                        <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-200 sticky top-0 bg-white z-20 pt-4">
+                    <div className="w-full max-w-4xl mx-auto bg-white/95 backdrop-blur-md min-h-screen p-6 md:p-8 shadow-2xl animate-fade-in-up">
+                        <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-200 sticky top-14 bg-white z-20 pt-4">
                             <button onClick={() => setSelectedLog(null)} className="flex items-center text-gray-500 hover:text-amber-800 font-bold text-lg px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"><Icon path={icons.left} className="w-6 h-6 mr-1"/> 返回</button>
-                            <div className="text-right"><h2 className="text-2xl font-black text-gray-800">戰役回放</h2><p className="text-gray-500 text-sm mt-1 font-mono">{selectedLog.date}</p></div>
+                            <div className="text-right">
+                                <h2 className="text-2xl font-black text-gray-800">戰役回放</h2>
+                                <p className="text-gray-500 text-sm mt-1 font-mono">{selectedLog.date}</p>
+                            </div>
                         </div>
                         <div className="space-y-6">
-                            <div className="flex justify-center mb-8"><div className="text-center"><div className="text-sm text-gray-400 font-bold uppercase mb-1">總得分</div><div className="text-5xl font-black text-amber-600">{selectedLog.score} <span className="text-2xl text-gray-300">/ {selectedLog.total}</span></div></div></div>
-                            {selectedLog.details.map((d, i) => (<div key={i} className={`p-6 rounded-2xl border-l-8 shadow-sm ${d.isCorrect ? 'border-green-400 bg-green-50/30' : 'border-red-400 bg-red-50/30'}`}><div className="mb-3 font-bold text-gray-800 text-xl leading-relaxed">{d.term} <span className="text-gray-500 text-base font-normal">({d.fullZhuyin})</span></div><div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 bg-white/50 p-3 rounded-lg"><div className="flex items-center"><span className="text-gray-400 text-xs font-bold uppercase mr-2">您的選擇</span><span className={`text-lg font-bold bopomofo ${d.isCorrect ? "text-green-700" : "text-red-600 line-through decoration-2"}`}>{d.userAnswer}</span></div>{!d.isCorrect && (<div className="flex items-center"><span className="text-gray-400 text-xs font-bold uppercase mr-2">正解</span><span className="text-green-700 text-lg font-black bopomofo">{d.correctAnswer}</span></div>)}</div></div>))}
+                            <div className="flex justify-center mb-8">
+                                <div className="text-center">
+                                    <div className="text-sm text-gray-400 font-bold uppercase mb-1">總得分</div>
+                                    <div className="text-5xl font-black text-amber-600">{selectedLog.score} <span className="text-2xl text-gray-300">/ {selectedLog.total}</span></div>
+                                </div>
+                            </div>
+                            {selectedLog.details.map((d, i) => (
+                                <div key={i} className={`p-6 rounded-2xl border-l-8 shadow-sm ${d.isCorrect ? 'border-green-400 bg-green-50/30' : 'border-red-400 bg-red-50/30'}`}>
+                                    <div className="mb-3 font-bold text-gray-800 text-xl leading-relaxed">
+                                        {d.term} <span className="text-gray-500 text-base font-normal">({d.fullZhuyin})</span>
+                                    </div>
+                                    <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 bg-white/50 p-3 rounded-lg">
+                                        <div className="flex items-center">
+                                            <span className="text-gray-400 text-xs font-bold uppercase mr-2">您的選擇</span>
+                                            <span className={`text-lg font-bold bopomofo ${d.isCorrect ? "text-green-700" : "text-red-600 line-through decoration-2"}`}>{d.userAnswer}</span>
+                                        </div>
+                                        {!d.isCorrect && (
+                                            <div className="flex items-center">
+                                                <span className="text-gray-400 text-xs font-bold uppercase mr-2">正解</span>
+                                                <span className="text-green-700 text-lg font-black bopomofo">{d.correctAnswer}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                         <div className="h-20"></div>
                     </div>
-                );
+                )
             }
             return (
-                <div className="max-w-4xl mx-auto px-4 py-8 mt-16">
-                    <div className="flex items-center mb-8"><button onClick={onMenu} className="mr-4 p-3 bg-white rounded-xl shadow border border-gray-200 hover:bg-gray-50"><Icon path={icons.left} className="w-5 h-5"/></button><h2 className="text-3xl font-black text-gray-800 flex items-center gap-3">📜 歷史戰績 <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{historyLog.length} 場</span></h2></div>
-                    {historyLog.length === 0 ? (<div className="text-center py-32 text-gray-400 border-2 border-dashed border-gray-200 rounded-3xl bg-white/80 backdrop-blur"><Icon path={icons.history} className="w-16 h-16 mx-auto mb-4 text-gray-300"/><p className="text-xl font-bold">尚無戰役紀錄</p><p className="text-sm mt-2">快去挑戰吧！</p></div>) : (<div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-lg overflow-hidden border border-gray-200"><table className="w-full text-left border-collapse"><thead className="bg-amber-50 border-b border-amber-100"><tr><th className="p-5 font-black text-amber-900 text-sm uppercase tracking-wider hidden md:table-cell">日期</th><th className="p-5 font-black text-amber-900 text-sm uppercase tracking-wider">主公</th><th className="p-5 font-black text-amber-900 text-sm uppercase tracking-wider">戰功</th><th className="p-5 font-black text-amber-900 text-sm uppercase tracking-wider text-right">操作</th></tr></thead><tbody className="divide-y divide-gray-100">{historyLog.map(log => (<tr key={log.id} className="hover:bg-amber-50/50 transition-colors group"><td className="p-5 text-gray-500 text-sm font-mono hidden md:table-cell">{log.date.split(',')[0]}</td><td className="p-5 font-bold text-gray-800"><div className="md:hidden text-xs text-gray-400 mb-1">{log.date.split(',')[0]}</div>{log.userName}</td><td className="p-5"><span className={`font-black px-3 py-1 rounded-lg text-sm ${log.score === log.total ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-700 border border-gray-200'}`}>{log.score} <span className="text-gray-400 font-normal">/ {log.total}</span></span></td><td className="p-5 text-right"><button onClick={() => setSelectedLog(log)} className="text-amber-600 hover:text-white hover:bg-amber-600 px-4 py-2 rounded-lg text-sm font-bold transition-all border border-amber-200 hover:border-amber-600">查看</button></td></tr>))}</tbody></table></div>)}
-                    <div className="text-center mt-12 pb-10"><button onClick={() => {if(confirm('確定焚毀所有戰報？此操作無法復原！')) setHistoryLog([])}} className="text-red-400 hover:text-red-600 text-sm flex items-center justify-center mx-auto hover:bg-red-50/80 px-4 py-2 rounded-lg transition-colors"><Icon path={icons.trash} className="w-4 h-4 mr-2"/> 清除所有紀錄</button></div>
+                <div className="max-w-4xl mx-auto px-4 py-8">
+                    <div className="flex items-center mb-8">
+                        <button onClick={onMenu} className="mr-4 p-3 bg-white rounded-xl shadow border border-gray-200 hover:bg-gray-50"><Icon path={icons.left} className="w-5 h-5"/></button>
+                        <h2 className="text-3xl font-black text-gray-800 flex items-center gap-3">📜 歷史戰績 <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{historyLog.length} 場</span></h2>
+                    </div>
+                    {historyLog.length === 0 ? (
+                        <div className="text-center py-32 text-gray-400 border-2 border-dashed border-gray-200 rounded-3xl bg-white/80 backdrop-blur">
+                            <Icon path={icons.history} className="w-16 h-16 mx-auto mb-4 text-gray-300"/>
+                            <p className="text-xl font-bold">尚無戰役紀錄</p>
+                            <p className="text-sm mt-2">快去挑戰吧！</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-lg overflow-hidden border border-gray-200">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-amber-50 border-b border-amber-100">
+                                    <tr>
+                                        <th className="p-5 font-black text-amber-900 text-sm uppercase tracking-wider hidden md:table-cell">日期</th>
+                                        <th className="p-5 font-black text-amber-900 text-sm uppercase tracking-wider">主公</th>
+                                        <th className="p-5 font-black text-amber-900 text-sm uppercase tracking-wider">戰功</th>
+                                        <th className="p-5 font-black text-amber-900 text-sm uppercase tracking-wider text-right">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {historyLog.map(log => (
+                                        <tr key={log.id} className="hover:bg-amber-50/50 transition-colors group">
+                                            <td className="p-5 text-gray-500 text-sm font-mono hidden md:table-cell">{log.date.split(',')[0]}</td>
+                                            <td className="p-5 font-bold text-gray-800">
+                                                <div className="md:hidden text-xs text-gray-400 mb-1">{log.date.split(',')[0]}</div>
+                                                {log.userName}
+                                            </td>
+                                            <td className="p-5">
+                                                <span className={`font-black px-3 py-1 rounded-lg text-sm ${log.score === log.total ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
+                                                    {log.score} <span className="text-gray-400 font-normal">/ {log.total}</span>
+                                                </span>
+                                            </td>
+                                            <td className="p-5 text-right">
+                                                <button onClick={() => setSelectedLog(log)} className="text-amber-600 hover:text-white hover:bg-amber-600 px-4 py-2 rounded-lg text-sm font-bold transition-all border border-amber-200 hover:border-amber-600">
+                                                    查看
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                     <div className="text-center mt-12 pb-10">
+                         <button onClick={() => {if(confirm('確定焚毀所有戰報？此操作無法復原！')) setHistoryLog([])}} className="text-red-400 hover:text-red-600 text-sm flex items-center justify-center mx-auto hover:bg-red-50/80 px-4 py-2 rounded-lg transition-colors">
+                             <Icon path={icons.trash} className="w-4 h-4 mr-2"/> 清除所有紀錄
+                        </button>
+                    </div>
                 </div>
             );
         };
 
-        const MistakeView = ({ mistakes, mistakeLog, setMistakeLog, onMenu, onReviewAll }) => (
-            <div className="max-w-4xl mx-auto px-4 py-8 mt-16">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
-                    <div className="flex items-center"><button onClick={onMenu} className="mr-4 p-3 bg-white rounded-xl shadow border border-gray-200 hover:bg-gray-50"><Icon path={icons.left} className="w-5 h-5"/></button><h2 className="text-3xl font-black text-gray-800 flex items-center"><Icon path={icons.alert} className="w-8 h-8 text-red-500 mr-3"/> 錯題軍令狀</h2></div>
-                    {mistakes.length > 0 && (<button onClick={onReviewAll} className="w-full md:w-auto px-8 py-3 bg-red-600 text-white rounded-xl shadow-lg hover:bg-red-700 font-bold animate-pulse flex items-center justify-center"><Icon path={icons.play} className="w-5 h-5 mr-2" fill="currentColor"/> 立即複習 ({mistakes.length})</button>)}
-                </div>
-                {mistakes.length === 0 ? (<div className="text-center py-32 bg-white/80 backdrop-blur rounded-3xl shadow-sm border border-green-100"><div className="text-8xl mb-6">🎉</div><p className="text-2xl text-gray-800 font-black mb-2">太棒了！</p><p className="text-gray-500">目前沒有錯題紀錄，繼續保持！</p></div>) : (<div className="grid gap-4">{mistakes.map(item => { const log = mistakeLog.find(m => m.id === item.id); return (<div key={item.id} className="bg-white/95 backdrop-blur-sm p-6 rounded-2xl shadow-sm border-l-8 border-red-400 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-shadow"><div><div className="flex items-center gap-3 mb-2"><h3 className="text-2xl font-black text-gray-800"><HighlightedTerm term={item.term} targetChar={item.targetChar} /></h3><span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-md border border-red-200">錯誤 {log.count} 次</span></div><div className="text-lg font-bold text-red-600 mb-1 bopomofo">{item.targetZhuyin}</div><p className="text-gray-600 text-base font-medium">{item.definition}</p></div><div className="text-xs text-gray-400 text-right md:w-32 flex-shrink-0 font-mono">最後錯誤:<br/>{new Date(log.lastMissed).toLocaleDateString()}</div></div>); })}</div>)}
-                {mistakes.length > 0 && (<div className="text-center mt-12 pb-10"><button onClick={() => {if(confirm('確定清空錯題本？這將移除所有錯誤紀錄。')) { setMistakeLog([]); safeLocalStorage.setItem(`${STORAGE_PREFIX}_Mistakes`, '[]'); } }} className="text-gray-400 hover:text-gray-600 text-sm hover:bg-gray-100/80 px-4 py-2 rounded-lg transition-colors">清空錯題本</button></div>)}
-            </div>
-        );
+        const MistakeView = ({ mistakes, mistakeLog, setMistakeLog, onMenu, onReviewAll }) => {
+            return (
+                <div className="max-w-4xl mx-auto px-4 py-8">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
+                        <div className="flex items-center">
+                            <button onClick={onMenu} className="mr-4 p-3 bg-white rounded-xl shadow border border-gray-200 hover:bg-gray-50"><Icon path={icons.left} className="w-5 h-5"/></button>
+                            <h2 className="text-3xl font-black text-gray-800 flex items-center"><Icon path={icons.alert} className="w-8 h-8 text-red-500 mr-3"/> 錯題軍令狀</h2>
+                        </div>
+                        {mistakes.length > 0 && (
+                            <button onClick={onReviewAll} className="w-full md:w-auto px-8 py-3 bg-red-600 text-white rounded-xl shadow-lg hover:bg-red-700 font-bold animate-pulse flex items-center justify-center">
+                                <Icon path={icons.play} className="w-5 h-5 mr-2" fill="currentColor"/>
+                                立即複習 ({mistakes.length})
+                            </button>
+                        )}
+                    </div>
 
-        // --- App Component ---
+                    {mistakes.length === 0 ? (
+                        <div className="text-center py-32 bg-white/80 backdrop-blur rounded-3xl shadow-sm border border-green-100">
+                            <div className="text-8xl mb-6">🎉</div>
+                            <p className="text-2xl text-gray-800 font-black mb-2">太棒了！</p>
+                            <p className="text-gray-500">目前沒有錯題紀錄，繼續保持！</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4">
+                            {mistakes.map(item => { 
+                                const log = mistakeLog.find(m => m.id === item.id); 
+                                return (
+                                    <div key={item.id} className="bg-white/95 backdrop-blur-sm p-6 rounded-2xl shadow-sm border-l-8 border-red-400 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-shadow">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <h3 className="text-2xl font-black text-gray-800">
+                                                    <HighlightedTerm term={item.term} targetChar={item.targetChar} />
+                                                </h3>
+                                                <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-md border border-red-200">錯誤 {log.count} 次</span>
+                                            </div>
+                                            <div className="text-lg font-bold text-red-600 mb-1 bopomofo">{item.targetZhuyin}</div>
+                                            <p className="text-gray-600 text-base font-medium">{item.definition}</p>
+                                        </div>
+                                        <div className="text-xs text-gray-400 text-right md:w-32 flex-shrink-0 font-mono">
+                                            最後錯誤:<br/>{new Date(log.lastMissed).toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                ); 
+                            })}
+                        </div>
+                    )}
+                    
+                    {mistakes.length > 0 && (
+                        <div className="text-center mt-12 pb-10">
+                            <button onClick={() => {if(confirm('確定清空錯題本？這將移除所有錯誤紀錄。')) { setMistakeLog([]); safeLocalStorage.setItem(`${STORAGE_PREFIX}_Mistakes`, '[]'); } }} className="text-gray-400 hover:text-gray-600 text-sm hover:bg-gray-100/80 px-4 py-2 rounded-lg transition-colors">
+                                清空錯題本
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         const App = () => {
             const parsedData = useMemo(() => ({ "精選字音": WORD_DATA }), []);
             const allItems = WORD_DATA;
+            const categories = ["精選字音"];
+
             const [currentMode, setCurrentMode] = useState('menu'); 
             const [activeCategory, setActiveCategory] = useState(null);
             const [showNameWarning, setShowNameWarning] = useState(false);
+            
             const [userName, setUserName] = useState('');
             const [isLocked, setIsLocked] = useState(false);
-            const [lastUser, setLastUser] = useState(() => safeLocalStorage.getItem(`${STORAGE_PREFIX}_LastUser`));
-            const [bgImage, setBgImage] = useState('');
             
-            // Music Trigger State
-            const [autoPlayTriggered, setAutoPlayTriggered] = useState(false);
-            const triggerMusic = () => setAutoPlayTriggered(true);
+            // 使用新前綴的 Storage Keys
+            const KEY_LAST_USER = `${STORAGE_PREFIX}_LastUser`;
+            const KEY_FAVORITES = `${STORAGE_PREFIX}_Favorites`;
+            const KEY_HISTORY = `${STORAGE_PREFIX}_History`;
+            const KEY_MISTAKES = `${STORAGE_PREFIX}_Mistakes`;
+            const KEY_COMPLETED = `${STORAGE_PREFIX}_CompletedDays`;
+            
+            const [lastUser, setLastUser] = useState(() => safeLocalStorage.getItem(KEY_LAST_USER));
 
-            // Data States
-            const [favorites, setFavorites] = useState(() => JSON.parse(safeLocalStorage.getItem(`${STORAGE_PREFIX}_Favorites`)) || []);
-            const [historyLog, setHistoryLog] = useState(() => JSON.parse(safeLocalStorage.getItem(`${STORAGE_PREFIX}_History`)) || []);
-            const [mistakeLog, setMistakeLog] = useState(() => JSON.parse(safeLocalStorage.getItem(`${STORAGE_PREFIX}_Mistakes`)) || []);
-            const [completedDays, setCompletedDays] = useState(() => JSON.parse(safeLocalStorage.getItem(`${STORAGE_PREFIX}_CompletedDays`)) || []);
+            // 背景圖狀態
+            const [bgImage, setBgImage] = useState('');
 
-            // Quiz States
+            // 初始化背景圖
+            useEffect(() => {
+                const randomNum = Math.floor(Math.random() * 5) + 1;
+                setBgImage(`images/san${randomNum}.jpg`);
+            }, []);
+
+            // 狀態初始化與 F5 保護 (Session Restore)
+            useEffect(() => {
+                const savedSessionUser = safeSessionStorage.getItem(`${STORAGE_PREFIX}_SessionUser`);
+                if (savedSessionUser) {
+                    setUserName(savedSessionUser);
+                    setIsLocked(true);
+                }
+            }, []);
+
+            const [favorites, setFavorites] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_FAVORITES)) || []);
+            const [historyLog, setHistoryLog] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_HISTORY)) || []);
+            const [mistakeLog, setMistakeLog] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_MISTAKES)) || []);
+            const [completedDays, setCompletedDays] = useState(() => JSON.parse(safeLocalStorage.getItem(KEY_COMPLETED)) || []);
+            const [learnPage, setLearnPage] = useState(0);
+
             const [quizQuestions, setQuizQuestions] = useState([]);
             const [quizScore, setQuizScore] = useState(0);
             const [combo, setCombo] = useState(0);
             const [quizPage, setQuizPage] = useState(0);
-            const [learnPage, setLearnPage] = useState(0);
 
-            // Effects
-            useEffect(() => {
-                const randomNum = Math.floor(Math.random() * 5) + 1;
-                setBgImage(`https://picsum.photos/1920/1080?random=${randomNum}`);
-                const savedSessionUser = safeSessionStorage.getItem(`${STORAGE_PREFIX}_SessionUser`);
-                if (savedSessionUser) { setUserName(savedSessionUser); setIsLocked(true); }
-            }, []);
+            // Music Player Reference to trigger play from interactions
+            const musicBarRef = useRef();
+
+            // 存儲副作用
+            useEffect(() => { safeLocalStorage.setItem(KEY_FAVORITES, JSON.stringify(favorites)); }, [favorites]);
+            useEffect(() => { safeLocalStorage.setItem(KEY_HISTORY, JSON.stringify(historyLog)); }, [historyLog]);
+            useEffect(() => { 
+                if (mistakeLog.length > 0) safeLocalStorage.setItem(KEY_MISTAKES, JSON.stringify(mistakeLog)); 
+                else if (mistakeLog.length === 0 && safeLocalStorage.getItem(KEY_MISTAKES)) safeLocalStorage.removeItem(KEY_MISTAKES);
+            }, [mistakeLog]);
+            useEffect(() => { safeLocalStorage.setItem(KEY_COMPLETED, JSON.stringify(completedDays)); }, [completedDays]);
             
-            useEffect(() => { safeLocalStorage.setItem(`${STORAGE_PREFIX}_Favorites`, JSON.stringify(favorites)); }, [favorites]);
-            useEffect(() => { safeLocalStorage.setItem(`${STORAGE_PREFIX}_History`, JSON.stringify(historyLog)); }, [historyLog]);
-            useEffect(() => { if (mistakeLog.length > 0) safeLocalStorage.setItem(`${STORAGE_PREFIX}_Mistakes`, JSON.stringify(mistakeLog)); else if (mistakeLog.length === 0 && safeLocalStorage.getItem(`${STORAGE_PREFIX}_Mistakes`)) safeLocalStorage.removeItem(`${STORAGE_PREFIX}_Mistakes`); }, [mistakeLog]);
-            useEffect(() => { safeLocalStorage.setItem(`${STORAGE_PREFIX}_CompletedDays`, JSON.stringify(completedDays)); }, [completedDays]);
-
-            // Handlers
+            // Login Handlers
             const handleLogin = () => {
                 if (userName.trim()) {
-                    setIsLocked(true); setShowNameWarning(false);
-                    safeLocalStorage.setItem(`${STORAGE_PREFIX}_LastUser`, userName);
+                    setIsLocked(true);
+                    setShowNameWarning(false);
+                    safeLocalStorage.setItem(KEY_LAST_USER, userName);
                     safeSessionStorage.setItem(`${STORAGE_PREFIX}_SessionUser`, userName); 
-                    setLastUser(userName); triggerMusic();
-                } else { setShowNameWarning(true); }
+                    setLastUser(userName);
+                    // Trigger music play on user interaction
+                    if (musicBarRef.current) musicBarRef.current.triggerPlay();
+                } else {
+                    setShowNameWarning(true);
+                }
             };
 
             const handleQuickLogin = () => {
-                const storedUser = safeLocalStorage.getItem(`${STORAGE_PREFIX}_LastUser`);
+                const storedUser = safeLocalStorage.getItem(KEY_LAST_USER);
                 if (storedUser) {
-                    setUserName(storedUser); setIsLocked(true); setShowNameWarning(false);
+                    setUserName(storedUser);
+                    setIsLocked(true);
+                    setShowNameWarning(false);
                     safeSessionStorage.setItem(`${STORAGE_PREFIX}_SessionUser`, storedUser);
-                    triggerMusic();
+                    // Trigger music play on user interaction
+                    if (musicBarRef.current) musicBarRef.current.triggerPlay();
                 }
             };
+
+            const handleLogout = () => {
+                if(confirm('確定要登出嗎？')) {
+                    setIsLocked(false);
+                    setUserName('');
+                    safeSessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`);
+                }
+            };
+
+            const handleDeleteUser = () => {
+                if (confirm('【危險操作】確定要刪除這位使用者的所有資料嗎？')) {
+                    if (confirm('再次確認：這將會清除所有學習紀錄、收藏和錯題本，且無法復原！確定要執行嗎？')) {
+                        safeLocalStorage.removeItem(KEY_LAST_USER);
+                        safeLocalStorage.removeItem(KEY_FAVORITES);
+                        safeLocalStorage.removeItem(KEY_HISTORY);
+                        safeLocalStorage.removeItem(KEY_MISTAKES);
+                        safeLocalStorage.removeItem(KEY_COMPLETED);
+                        safeSessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`);
+                        
+                        setFavorites([]);
+                        setHistoryLog([]);
+                        setMistakeLog([]);
+                        setCompletedDays([]);
+                        setLastUser(null);
+                        setIsLocked(false);
+                        setUserName('');
+                    }
+                }
+            };
+
+            const toggleFavorite = (id) => { 
+                setFavorites(prev => prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]); 
+            };
             
+            // Sound Effects
+            const playSoundEffect = (type) => {
+                 try {
+                     // 使用新提供的音效
+                    let audio;
+                    if (type === 'correct') {
+                         audio = new Audio('sounds/correct.mp3');
+                    } else {
+                         audio = new Audio('sounds/fail.mp3');
+                    }
+                    audio.volume = 0.4;
+                    const playPromise = audio.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise.catch(e => {
+                            console.log("Audio file play failed, fallback to oscillator", e);
+                            // Fallback to oscillator if file doesn't exist or play fails
+                            const AudioContext = window.AudioContext || window.webkitAudioContext;
+                            if (!AudioContext) return;
+                            const ctx = new AudioContext();
+                            const now = ctx.currentTime;
+                            if (type === 'correct') {
+                                const osc1 = ctx.createOscillator(); const gain1 = ctx.createGain();
+                                osc1.type = 'sine'; osc1.frequency.setValueAtTime(523.25, now); gain1.gain.setValueAtTime(0.1, now); gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5); osc1.connect(gain1); gain1.connect(ctx.destination); osc1.start(now); osc1.stop(now + 0.5);
+                            } else {
+                                const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                                osc.type = 'triangle'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(50, now + 0.3); gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3); osc.connect(gain); gain.connect(ctx.destination); osc.start(now); osc.stop(now + 0.3);
+                            }
+                        });
+                    }
+                } catch (e) { console.error("Audio play failed", e); }
+            };
+
             const handleStartQuiz = (category, pageIdx = 0, isMistakeMode = false) => {
                 if (!isLocked) { setShowNameWarning(true); return; }
-                triggerMusic();
+                
+                // Trigger music play on user interaction (start button)
+                if (musicBarRef.current) musicBarRef.current.triggerPlay();
+
                 let questions = [];
+                
                 if (isMistakeMode) {
                     const mistakeIds = mistakeLog.map(m => m.id);
                     questions = allItems.filter(i => mistakeIds.includes(i.id));
                     questions.sort(() => Math.random() - 0.5);
                 } else {
                     let sourceItems = category === '收藏夾' ? allItems.filter(i => favorites.includes(i.id)) : parsedData["精選字音"];
-                    if (!sourceItems || sourceItems.length === 0) { alert("此分類尚無內容！"); return; }
+                    if (!sourceItems || sourceItems.length === 0) {
+                         alert("此分類尚無內容，請先進行收藏或選擇其他分類！");
+                         return;
+                    }
                     const start = pageIdx * ITEMS_PER_PAGE;
-                    if (start >= sourceItems.length && pageIdx > 0) { handleStartQuiz(category, Math.floor((sourceItems.length - 1) / ITEMS_PER_PAGE), isMistakeMode); return; }
+                    if (start >= sourceItems.length && pageIdx > 0) {
+                         const correctPage = Math.floor((sourceItems.length - 1) / ITEMS_PER_PAGE);
+                         handleStartQuiz(category, correctPage, isMistakeMode);
+                         return;
+                    }
                     questions = sourceItems.slice(start, start + ITEMS_PER_PAGE);
                 }
-                if (questions.length === 0) { alert(isMistakeMode ? "太棒了！目前沒有錯題需要複習！" : "此頁面無題目"); return; }
-                
+
+                if (questions.length === 0) {
+                    alert(isMistakeMode ? "太棒了！目前沒有錯題需要複習！" : "此頁面無題目");
+                    return;
+                }
+
                 const quizSet = questions.map(item => {
                     const correctOption = { id: item.targetZhuyin, text: item.targetZhuyin };
                     const distractorOptions = item.distractors.map(d => ({ id: d, text: d }));
@@ -740,70 +1416,153 @@
                     return { ...item, options, userAnswer: null, isCorrect: null };
                 });
 
-                setQuizQuestions(quizSet); setQuizScore(0); setCombo(0); setQuizPage(pageIdx);
-                setActiveCategory(isMistakeMode ? '錯題本' : category); setCurrentMode('quiz'); window.scrollTo(0,0);
+                setQuizQuestions(quizSet);
+                setQuizScore(0);
+                setCombo(0);
+                setQuizPage(pageIdx);
+                setActiveCategory(isMistakeMode ? '錯題本' : category);
+                setCurrentMode('quiz');
+                window.scrollTo(0,0);
             };
 
             const handleAnswer = (qIndex, selectedOptionId) => {
                 const newQuestions = [...quizQuestions];
                 const q = newQuestions[qIndex];
-                if (q.userAnswer !== null) return;
+                if (q.userAnswer !== null) return; 
+
+                // 判斷邏輯更新：比對注音字串
                 const isCorrect = selectedOptionId === q.targetZhuyin;
-                q.userAnswer = selectedOptionId; q.isCorrect = isCorrect;
+                q.userAnswer = selectedOptionId;
+                q.isCorrect = isCorrect;
 
                 if (isCorrect) {
-                    setQuizScore(s => s + 1); setCombo(c => c + 1);
-                    if (combo > 0 && (combo + 1) % 5 === 0) confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                    else confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 }, scalar: 0.7 });
+                    setQuizScore(s => s + 1);
+                    setCombo(c => c + 1);
+                    playSoundEffect('correct');
+                    if (combo > 0 && (combo + 1) % 5 === 0) {
+                         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                    } else {
+                         confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 }, scalar: 0.7 });
+                    }
                 } else {
                     setCombo(0);
+                    playSoundEffect('wrong');
                     setMistakeLog(prev => {
                         const existing = prev.find(m => m.id === q.id);
-                        return existing ? prev.map(m => m.id === q.id ? { ...m, count: m.count + 1, lastMissed: new Date().toISOString() } : m) : [...prev, { id: q.id, count: 1, lastMissed: new Date().toISOString() }];
+                        const newLog = existing 
+                            ? prev.map(m => m.id === q.id ? { ...m, count: m.count + 1, lastMissed: new Date().toISOString() } : m) 
+                            : [...prev, { id: q.id, count: 1, lastMissed: new Date().toISOString() }];
+                        return newLog;
                     });
                 }
                 setQuizQuestions(newQuestions);
             };
 
             const finishQuiz = () => {
-                const record = { id: Date.now(), date: new Date().toLocaleString(), userName, score: quizScore, total: quizQuestions.length, category: activeCategory, details: quizQuestions.map(q => ({ term: q.term, definition: q.definition, sentence: q.sentence, fullZhuyin: q.fullZhuyin, isCorrect: q.isCorrect, userAnswer: q.userAnswer || "未作答", correctAnswer: q.targetZhuyin })) };
+                const record = { 
+                    id: Date.now(), 
+                    date: new Date().toLocaleString(), 
+                    userName, 
+                    score: quizScore, 
+                    total: quizQuestions.length, 
+                    category: activeCategory, 
+                    details: quizQuestions.map(q => ({ 
+                        term: q.term, 
+                        definition: q.definition, 
+                        sentence: q.sentence, 
+                        fullZhuyin: q.fullZhuyin, // 增加完整注音到紀錄
+                        isCorrect: q.isCorrect, 
+                        userAnswer: q.userAnswer || "未作答", 
+                        correctAnswer: q.targetZhuyin 
+                    })) 
+                };
                 setHistoryLog(prev => [record, ...prev]);
-                if (activeCategory !== '收藏夾' && activeCategory !== '錯題本') {
-                    const key = `${activeCategory}-${quizPage}`;
-                    if (!completedDays.includes(key) && quizScore > 0) setCompletedDays(prev => [...prev, key]);
+                if (activeCategory !== '收藏夾' && activeCategory !== '錯題本') { 
+                    const key = `${activeCategory}-${quizPage}`; 
+                    if (!completedDays.includes(key) && quizScore > 0) { 
+                        setCompletedDays(prev => [...prev, key]); 
+                    } 
                 }
             };
 
-            // Render
             return (
                 <div className="min-h-screen font-sans selection:bg-amber-200 selection:text-amber-900 relative">
-                    <div className="fixed inset-0 z-0 bg-cover bg-center transition-all duration-1000 no-print" style={{ backgroundImage: `url('${bgImage}')`, backgroundColor: '#fcf9f2' }}></div>
+                    {/* Background Layer */}
+                    <div 
+                        className="fixed inset-0 z-0 bg-cover bg-center transition-all duration-1000 no-print"
+                        style={{ 
+                            backgroundImage: `url('${bgImage}')`,
+                            backgroundColor: '#fcf9f2' 
+                        }}
+                    ></div>
+                    {/* Overlay for Readability */}
                     <div className="fixed inset-0 z-0 bg-white/70 backdrop-blur-[2px] no-print"></div>
                     
-                    <MusicPlayer autoPlayTriggered={autoPlayTriggered} />
+                    {/* 音樂播放器 (現在位於頂端) */}
+                    <MusicBar ref={musicBarRef} />
 
+                    {/* Main Content Area */}
                     <div className="relative z-10">
                         {currentMode === 'menu' && (
                             <MenuView 
                                 userName={userName} setUserName={setUserName} showNameWarning={showNameWarning}
                                 mistakeLog={mistakeLog} favorites={favorites} parsedData={parsedData}
-                                onStartLearn={(cat) => { triggerMusic(); setActiveCategory(cat); setLearnPage(0); setCurrentMode('learn'); }}
+                                onStartLearn={(cat) => { setActiveCategory(cat); setLearnPage(0); setCurrentMode('learn'); if(musicBarRef.current) musicBarRef.current.triggerPlay(); }}
                                 onStartQuiz={(cat) => handleStartQuiz(cat, 0)}
-                                onViewHistory={() => { triggerMusic(); setCurrentMode('history'); }}
-                                onViewMistakes={() => { triggerMusic(); setCurrentMode('mistakes'); }}
-                                onViewTable={() => { triggerMusic(); setCurrentMode('table'); }}
+                                onViewHistory={() => setCurrentMode('history')}
+                                onViewMistakes={() => setCurrentMode('mistakes')}
+                                onViewTable={() => setCurrentMode('table')}
                                 onPrintExam={() => setCurrentMode('print')}
                                 onLogin={handleLogin} isLocked={isLocked} onQuickLogin={handleQuickLogin} lastUser={lastUser}
-                                onLogout={() => { setIsLocked(false); setUserName(''); safeSessionStorage.removeItem(`${STORAGE_PREFIX}_SessionUser`); }}
-                                onDeleteUser={() => handleDeleteUser()}
+                                onLogout={handleLogout} onDeleteUser={handleDeleteUser}
                             />
                         )}
-                        {currentMode === 'learn' && <LearnView onMenu={() => setCurrentMode('menu')} items={activeCategory === '收藏夾' ? allItems.filter(i => favorites.includes(i.id)) : parsedData["精選字音"]} learnPage={learnPage} setLearnPage={setLearnPage} favorites={favorites} toggleFavorite={item => setFavorites(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])} completedDays={completedDays} />}
-                        {currentMode === 'quiz' && <QuizView questions={quizQuestions} score={quizScore} userName={userName} combo={combo} onAnswer={handleAnswer} onFinish={finishQuiz} onMenu={() => setCurrentMode('menu')} onViewHistory={() => setCurrentMode('history')} favorites={favorites} toggleFavorite={item => setFavorites(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])} totalItems={activeCategory === '收藏夾' ? favorites.length : parsedData["精選字音"].length} quizPage={quizPage} onPageChange={(p) => handleStartQuiz(activeCategory, p)} completedDays={completedDays} />}
-                        {currentMode === 'history' && <HistoryView onMenu={() => setCurrentMode('menu')} historyLog={historyLog} setHistoryLog={setHistoryLog} />}
-                        {currentMode === 'mistakes' && <MistakeView onMenu={() => setCurrentMode('menu')} mistakes={allItems.filter(i => mistakeLog.some(m => m.id === i.id))} mistakeLog={mistakeLog} setMistakeLog={setMistakeLog} onReviewAll={() => handleStartQuiz(null, 0, true)} />}
-                        {currentMode === 'table' && <TableView onMenu={() => setCurrentMode('menu')} items={WORD_DATA} favorites={favorites} toggleFavorite={item => setFavorites(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])} />}
-                        {currentMode === 'print' && <PrintExamView onMenu={() => setCurrentMode('menu')} items={WORD_DATA} />}
+                        {currentMode === 'learn' && (
+                            <LearnView 
+                                items={activeCategory === '收藏夾' ? allItems.filter(i => favorites.includes(i.id)) : parsedData["精選字音"]}
+                                learnPage={learnPage} setLearnPage={setLearnPage}
+                                favorites={favorites} toggleFavorite={toggleFavorite}
+                                completedDays={completedDays}
+                                onMenu={() => setCurrentMode('menu')}
+                            />
+                        )}
+                        {currentMode === 'quiz' && (
+                            <QuizView 
+                                questions={quizQuestions} score={quizScore} userName={userName} combo={combo}
+                                onAnswer={handleAnswer} onFinish={finishQuiz}
+                                onMenu={() => setCurrentMode('menu')}
+                                onViewHistory={() => setCurrentMode('history')}
+                                favorites={favorites} toggleFavorite={toggleFavorite}
+                                activeCategory={activeCategory}
+                                totalItems={activeCategory === '收藏夾' ? favorites.length : parsedData["精選字音"].length}
+                                quizPage={quizPage}
+                                onPageChange={(page) => handleStartQuiz(activeCategory, page)}
+                                completedDays={completedDays}
+                            />
+                        )}
+                        {currentMode === 'history' && <HistoryView historyLog={historyLog} setHistoryLog={setHistoryLog} onMenu={() => setCurrentMode('menu')} />}
+                        {currentMode === 'mistakes' && (
+                            <MistakeView 
+                                mistakes={allItems.filter(i => mistakeLog.some(m => m.id === i.id))}
+                                mistakeLog={mistakeLog} setMistakeLog={setMistakeLog}
+                                onMenu={() => setCurrentMode('menu')}
+                                onReviewAll={() => handleStartQuiz(null, 0, true)}
+                            />
+                        )}
+                        {currentMode === 'table' && (
+                            <TableView 
+                                items={allItems}
+                                onMenu={() => setCurrentMode('menu')}
+                                favorites={favorites}
+                                toggleFavorite={toggleFavorite}
+                            />
+                        )}
+                        {currentMode === 'print' && (
+                            <PrintExamView 
+                                items={allItems}
+                                onMenu={() => setCurrentMode('menu')}
+                            />
+                        )}
                     </div>
                 </div>
             );
